@@ -4,6 +4,7 @@ import { MapPin, Plus, Trash2 } from "lucide-react";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { cn } from "@/lib/utils";
+import { getCourseCode } from "@/lib/courseLabels";
 
 const HOUR_HEIGHT = 64;
 const GRID_TOP_GUTTER = 16;
@@ -190,7 +191,7 @@ export default function CalendarPage() {
                         const index = overlapping.findIndex((item) => item.id === event.id);
                         const style = getEventStyle(event, overlapping, index);
                         const blockTitle = event.isCourse
-                          ? event.title.match(/^[A-Z]+\s+\d+[A-Z]*/)?.[0] ?? event.title
+                          ? getCourseCode(event.title)
                           : event.title;
                         return (
                           <div
@@ -217,8 +218,8 @@ export default function CalendarPage() {
                                 )}>
                                   {blockTitle}
                                 </p>
-                                {event.eventType && (
-                                  <span className="shrink-0 text-[10px] leading-3 opacity-80">{event.eventType}</span>
+                                {event.eventType && overlapping.length === 1 && (
+                                  <span className="max-w-[40%] truncate text-[10px] leading-3 opacity-80">{event.eventType}</span>
                                 )}
                               </div>
                               {style.height >= 48 && (
