@@ -8,6 +8,7 @@ export interface CalendarEvent {
   isCourse?: boolean;
   courseId?: string;
   eventType?: string;
+  location?: string;
 }
 
 export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri";
