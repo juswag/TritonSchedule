@@ -20,6 +20,7 @@ import { useSearchParams } from "react-router-dom";
 import { Course, CourseExamSection, DiscussionSection } from "@/data/sampleCourses";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
+import { getCourseCode } from "@/lib/courseLabels";
 import { cn } from "@/lib/utils";
 import { getProfessorProfileUrl, normalizeProfessorProfileUrl } from "@/lib/professorProfile";
 import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConflicts";
@@ -1084,6 +1085,7 @@ function courseScheduleToEvents(course: Course, color: string): CalendarEvent[] 
       isCourse: true,
       courseId: course.id,
       eventType: "Lecture",
+      location: meeting.location?.trim() || "TBA",
     }));
   });
 }
@@ -1109,6 +1111,7 @@ function sectionScheduleToEvents(
     isCourse: true,
     courseId: course.id,
     eventType,
+    location: section.location?.trim() || "TBA",
   }));
 }
 
@@ -1330,11 +1333,6 @@ function formatCourseLocations(course: Course): string {
 function sortWeekdays(days: Weekday[]): Weekday[] {
   const order: Weekday[] = ["Mon", "Tue", "Wed", "Thu", "Fri"];
   return order.filter((day) => days.includes(day));
-}
-
-function getCourseCode(name: string): string {
-  const match = name.match(/\b[A-Z]{2,5}\s*\d{1,3}[A-Z]?\b/i);
-  return match?.[0].toUpperCase().replace(/([A-Z])(\d)/, "$1 $2") ?? name;
 }
 
 function getCourseTitle(name: string): string {

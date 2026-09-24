@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { MapPin, Plus, Trash2 } from "lucide-react";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { cn } from "@/lib/utils";
+import { getCourseCode } from "@/lib/courseLabels";
 
 const HOUR_HEIGHT = 64;
 const GRID_TOP_GUTTER = 16;
@@ -126,6 +127,11 @@ export default function CalendarPage() {
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatTo12Hour(event.startTime)} - {formatTo12Hour(event.endTime)}
                       </p>
+                      {(event.isCourse || event.location) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {event.location || "Location unavailable"}
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -184,6 +190,9 @@ export default function CalendarPage() {
                         const overlapping = findOverlappingEvents(event, dayEvents);
                         const index = overlapping.findIndex((item) => item.id === event.id);
                         const style = getEventStyle(event, overlapping, index);
+                        const blockTitle = event.isCourse
+                          ? getCourseCode(event.title)
+                          : event.title;
                         return (
                           <div
                             key={event.id}
@@ -191,18 +200,40 @@ export default function CalendarPage() {
                             style={{ top: `${style.top}px`, height: `${style.height}px`, width: style.width, left: style.left }}
                           >
                             <div
-                              className="group relative h-full overflow-hidden rounded-[5px] border px-2 py-1.5"
+                              className={cn(
+                                "group relative flex h-full flex-col overflow-hidden rounded-[5px] border px-2",
+                                style.height >= 72 ? "gap-1 py-2" : style.height >= 52 ? "gap-0.5 py-0.5" : "py-0.5"
+                              )}
+                              title={`${event.title}\n${formatTo12Hour(event.startTime)} - ${formatTo12Hour(event.endTime)}${event.isCourse || event.location ? `\n${event.location || "Location unavailable"}` : ""}`}
                               style={{
                                 borderColor: event.color,
                                 color: event.color,
                                 backgroundColor: `color-mix(in srgb, ${event.color} 11%, white)`,
                               }}
                             >
-                              <p className="truncate text-xs font-semibold leading-tight">{event.title}</p>
-                              {style.height >= 48 && (
-                                <p className="mt-1 truncate text-[10px] font-medium opacity-80">
-                                  {formatTo12Hour(event.startTime)} - {formatTo12Hour(event.endTime)}
+                              <div className="flex min-w-0 shrink-0 items-baseline justify-between gap-2">
+                                <p className={cn(
+                                  "truncate text-xs font-semibold",
+                                  style.height >= 52 ? "leading-[14px]" : "leading-3"
+                                )}>
+                                  {blockTitle}
                                 </p>
+                                {event.eventType && overlapping.length === 1 && (
+                                  <span className="max-w-[40%] truncate text-[10px] leading-3 opacity-80">{event.eventType}</span>
+                                )}
+                              </div>
+                              {style.height >= 48 && (
+                                <p className="shrink-0 truncate text-[10px] leading-3 opacity-80">
+                                  {formatTo12Hour(event.startTime)} – {formatTo12Hour(event.endTime)}
+                                </p>
+                              )}
+                              {(event.isCourse || event.location) && (
+                                <div className="flex min-w-0 shrink-0 items-center gap-1 text-[10px] font-medium leading-3">
+                                  <MapPin aria-hidden="true" className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate" title={event.location || "Location unavailable"}>
+                                    {event.location || "Location unavailable"}
+                                  </span>
+                                </div>
                               )}
                               <button
                                 type="button"
