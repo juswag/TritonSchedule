@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { CalendarEvent } from "@/types/calendar";
+import { CalendarCourse, CalendarEvent } from "@/types/calendar";
 
 interface CalendarContextType {
   events: CalendarEvent[];
+  examOnlyCourses: CalendarCourse[];
+  addExamOnlyCourse: (course: CalendarCourse) => void;
   addEvent: (event: CalendarEvent) => void;
   updateEvent: (id: string, event: Partial<CalendarEvent>) => void;
   deleteEvent: (id: string) => void;
@@ -11,6 +13,19 @@ interface CalendarContextType {
 
 const CalendarContext = createContext<CalendarContextType | undefined>(undefined);
 const CALENDAR_EVENTS_STORAGE_KEY = "calendarEvents";
+const EXAM_ONLY_COURSES_STORAGE_KEY = "calendarExamOnlyCourses";
+
+function loadExamOnlyCourses(): CalendarCourse[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(EXAM_ONLY_COURSES_STORAGE_KEY) ?? "[]");
+    if (!Array.isArray(stored)) return [];
+    return stored.filter((course): course is CalendarCourse => course && typeof course.id === "string"
+      && typeof course.title === "string" && typeof course.color === "string" && Array.isArray(course.exams));
+  } catch {
+    return [];
+  }
+}
 
 function loadStoredEvents(): CalendarEvent[] {
   if (typeof window === "undefined") {
@@ -45,10 +60,19 @@ function loadStoredEvents(): CalendarEvent[] {
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<CalendarEvent[]>(() => loadStoredEvents());
+  const [examOnlyCourses, setExamOnlyCourses] = useState<CalendarCourse[]>(loadExamOnlyCourses);
 
   useEffect(() => {
     window.localStorage.setItem(CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify(events));
   }, [events]);
+
+  useEffect(() => {
+    window.localStorage.setItem(EXAM_ONLY_COURSES_STORAGE_KEY, JSON.stringify(examOnlyCourses));
+  }, [examOnlyCourses]);
+
+  const addExamOnlyCourse = (course: CalendarCourse) => {
+    setExamOnlyCourses((previous) => [...previous.filter((item) => item.id !== course.id), course]);
+  };
 
   const addEvent = (event: CalendarEvent) => {
     setEvents((prev) => [...prev, event]);
@@ -68,11 +92,12 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   const deleteEventsByCourseId = (courseId: string) => {
     setEvents((prev) => prev.filter((event) => event.courseId !== courseId));
+    setExamOnlyCourses((prev) => prev.filter((course) => course.id !== courseId));
   };
 
   return (
     <CalendarContext.Provider
-      value={{ events, addEvent, updateEvent, deleteEvent, deleteEventsByCourseId }}
+      value={{ events, examOnlyCourses, addExamOnlyCourse, addEvent, updateEvent, deleteEvent, deleteEventsByCourseId }}
     >
       {children}
     </CalendarContext.Provider>

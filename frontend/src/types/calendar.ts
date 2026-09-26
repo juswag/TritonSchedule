@@ -23,6 +23,14 @@ export interface CalendarExam {
   location: string;
 }
 
+/** A selected course with published exams but no usable recurring meetings. */
+export interface CalendarCourse {
+  id: string;
+  title: string;
+  color: string;
+  exams: CalendarExam[];
+}
+
 export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri";
 
 export type EventColor = {

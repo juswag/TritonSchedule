@@ -131,4 +131,26 @@ describe("exam schedule", () => {
     expect(getCourseExams(course, undefined, lab).map((exam) => exam.time)).toEqual(["Oct 27", "Dec 7", "TBA"]);
     expect(getCourseExams({ ...course, midterm: undefined, final: undefined })).toEqual([]);
   });
+  it("preserves canonical primary finals and honors an explicitly empty primary list", () => {
+    const course: Course = { id: "c", name: "CSE 11", instructor: "", description: "", color: "blue", schedule: "TBA", final: "legacy", exams: [
+      { id: "f1", name: "Final", type: "final", time: "2026-12-07 08:00-11:00", location: "A" },
+      { id: "f2", name: "Final", type: "final", time: "2026-12-07 08:00-11:00", location: "B" },
+      { id: "f3", name: "Final", type: "final", time: "2026-12-08 08:00-11:00", location: "C" },
+    ] };
+    expect(getCourseExams(course)).toEqual(course.exams);
+    const schedule = getExamSchedule([], [{ id: course.id, title: course.name, color: course.color, exams: getCourseExams(course) }]);
+    expect(schedule.exams).toHaveLength(2);
+    expect(schedule.exams[0].location).toBe("A, B");
+    expect(getCourseExams({ ...course, exams: [] })).toEqual([]);
+  });
+
+  it("finds overlaps between exam-only and weekly courses without duplicate course entries", () => {
+    const weekly = examCourse("CSE 11", "2026-10-27 19:00-21:00");
+    const other = examCourse("MATH 20A", "2026-10-27 20:00-22:00");
+    const examOnly = { id: other.courseId!, title: other.title, color: other.color, exams: other.exams! };
+    expect(getExamSchedule([weekly], [examOnly]).conflicts).toHaveLength(1);
+    expect(getExamSchedule([weekly, other], [examOnly]).exams).toHaveLength(2);
+    expect(getExamSchedule([weekly], []).conflicts).toEqual([]);
+  });
+
 });

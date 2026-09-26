@@ -1,5 +1,5 @@
 import type { Course, DiscussionSection } from "@/data/sampleCourses";
-import type { CalendarEvent, CalendarExam } from "@/types/calendar";
+import type { CalendarCourse, CalendarEvent, CalendarExam } from "@/types/calendar";
 import { getCourseCode } from "@/lib/courseLabels";
 
 export interface ScheduledExam {
@@ -33,8 +33,10 @@ export function getCourseExams(course: Course, discussion?: DiscussionSection, l
     ? { id: `${course.id}-final`, name: "Final", time: course.final, location: "TBA" }
     : null);
   return [
-    ...midterms.map((exam): CalendarExam => ({ ...exam, type: "midterm" })),
-    ...(final ? [{ ...final, type: "final" as const }] : []),
+    ...(course.exams ?? [
+      ...midterms.map((exam): CalendarExam => ({ ...exam, type: "midterm" })),
+      ...(final ? [{ ...final, type: "final" as const }] : []),
+    ]),
     ...(discussion?.exams ?? []),
     ...(lab?.exams ?? []),
   ];
@@ -89,7 +91,7 @@ function isExam(value: unknown): value is CalendarExam {
     && typeof exam.location === "string";
 }
 
-export function getExamSchedule(events: CalendarEvent[]): {
+export function getExamSchedule(events: CalendarEvent[], examOnlyCourses: CalendarCourse[] = []): {
   exams: ScheduledExam[];
   conflicts: ExamConflict[];
   missingCourses: { id: string; title: string }[];
@@ -102,16 +104,24 @@ export function getExamSchedule(events: CalendarEvent[]): {
   }
   const exams: ScheduledExam[] = [];
   const missingCourses: { id: string; title: string }[] = [];
+  const scheduledCourses = new Map<string, { id: string; title: string; color: string; exams?: CalendarExam[] }>(
+    examOnlyCourses.map((course) => [course.id, course]),
+  );
   for (const [courseId, meetings] of courses) {
     const course = meetings.find((meeting) => meeting.eventType === "Lecture") ?? meetings[0];
-    const courseTitle = course.courseTitle || course.title;
     const saved = meetings.find((meeting) => Array.isArray(meeting.exams));
-    if (!saved) {
+    scheduledCourses.set(courseId, {
+      id: courseId, title: course.courseTitle || course.title, color: course.color, exams: saved?.exams,
+    });
+  }
+  for (const [courseId, course] of scheduledCourses) {
+    const courseTitle = course.title;
+    if (!Array.isArray(course.exams)) {
       missingCourses.push({ id: courseId, title: courseTitle });
       continue;
     }
     const sittings = new Map<string, ScheduledExam>();
-    for (const exam of saved.exams!.filter(isExam)) {
+    for (const exam of course.exams.filter(isExam)) {
       const schedule = parseExamSchedule(exam.time);
       const key = JSON.stringify([exam.type, schedule.start ?? exam.time, schedule.end,
         schedule.start === null ? exam.id : null]);

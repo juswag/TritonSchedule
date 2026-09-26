@@ -51,14 +51,17 @@ function findOverlappingEvents(event: CalendarEvent, allEvents: CalendarEvent[])
 }
 
 export default function CalendarPage() {
-  const { events, deleteEventsByCourseId, deleteEvent } = useCalendar();
+  const { events, examOnlyCourses, deleteEventsByCourseId, deleteEvent } = useCalendar();
   const [activeTab, setActiveTab] = useState("weekly");
-  const examSchedule = useMemo(() => getExamSchedule(events), [events]);
+  const examSchedule = useMemo(() => getExamSchedule(events, examOnlyCourses), [events, examOnlyCourses]);
   const [selectedMobileDay, setSelectedMobileDay] = useState<Weekday>("Mon");
 
   const courseCount = useMemo(
-    () => new Set(events.filter((event) => event.isCourse).map((event) => event.courseId || event.id)).size,
-    [events]
+    () => new Set([
+      ...events.filter((event) => event.isCourse).map((event) => event.courseId || event.id),
+      ...examOnlyCourses.map((course) => course.id),
+    ]).size,
+    [events, examOnlyCourses]
   );
 
   const removeEvent = (event: CalendarEvent) => {
@@ -279,7 +282,7 @@ export default function CalendarPage() {
         </div>
           </TabsContent>
           <TabsContent value="exams" className="mt-0">
-            <ExamSchedule {...examSchedule} courseCount={courseCount} />
+            <ExamSchedule {...examSchedule} courseCount={courseCount} examOnlyCourses={examOnlyCourses} onRemoveCourse={deleteEventsByCourseId} />
           </TabsContent>
         </Tabs>
       </div>

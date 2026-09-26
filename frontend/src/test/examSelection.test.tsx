@@ -239,3 +239,42 @@ describe("course search selection and recovery", () => {
     expect(screen.getByRole("textbox", { name: "Search courses" })).toHaveValue("CSE 11");
   });
 });
+
+describe("courses with published exams but no weekly meetings", () => {
+  it("saves, reloads and removes the course without creating a weekly placeholder", async () => {
+    mockCatalog([{ ...course, Lecture: { Days: "TBA", Time: "TBA" }, Discussions: [] }]);
+    const search = renderSearch();
+    const add = await screen.findByRole("button", { name: "Add section" });
+    expect(add).toBeEnabled();
+    fireEvent.click(add);
+    expect(await screen.findByRole("button", { name: "Added to schedule" })).toBeDisabled();
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]");
+      expect(stored).toHaveLength(1);
+      expect(stored[0]).toMatchObject({ id: course.id, title: course.Name, exams: expect.arrayContaining([
+        expect.objectContaining({ location: "MIDTERM ROOM" }),
+        expect.objectContaining({ location: "FINAL ROOM" }),
+      ]) });
+    });
+    expect(savedEvents()).toEqual([]);
+    search.unmount();
+    render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
+    expect(screen.getByText("1 course")).toBeVisible();
+    expect(screen.queryByText(course.Name)).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Exams" }), { button: 0, ctrlKey: false });
+    expect(screen.getByText("No weekly meetings")).toBeVisible();
+    expect(within(screen.getByRole("table", { name: "Midterms" })).getByText("MIDTERM ROOM")).toBeVisible();
+    expect(within(screen.getByRole("table", { name: "Finals" })).getByText("FINAL ROOM")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: `Remove ${course.Name}` }));
+    expect(screen.getByText("0 courses")).toBeVisible();
+    expect(screen.getByText("Add courses to see their exam details")).toBeVisible();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]")).toEqual([]));
+  });
+
+  it("does not bypass an unavailable required discussion to save only exams", async () => {
+    mockCatalog([{ ...course, Lecture: { Days: "TBA", Time: "TBA" }, Discussions: [{ Days: "TBA", Time: "TBA" }] }]);
+    renderSearch();
+    expect(await screen.findByRole("button", { name: "Add section" })).toBeDisabled();
+    expect(screen.getByText("No conflict-free discussion sections are available.")).toBeVisible();
+  });
+});

@@ -45,6 +45,8 @@ export interface Course {
   rmpProfileUrl?: string;
   discussionSections?: DiscussionSection[];
   labSections?: DiscussionSection[];
+  /** Complete primary-section exams; undefined for older catalog responses. */
+  exams?: CalendarExam[];
   midtermSections?: CourseExamSection[];
   finalSection?: CourseExamSection | null;
   midterm?: string;

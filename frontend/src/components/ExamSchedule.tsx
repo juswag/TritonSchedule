@@ -1,5 +1,6 @@
 import { Fragment, useId } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
+import type { CalendarCourse } from "@/types/calendar";
 import type { ExamConflict, ScheduledExam } from "@/lib/examSchedule";
 
 type ExamScheduleProps = {
@@ -7,9 +8,11 @@ type ExamScheduleProps = {
   conflicts: ExamConflict[];
   missingCourses: { id: string; title: string }[];
   courseCount: number;
+  examOnlyCourses?: CalendarCourse[];
+  onRemoveCourse?: (courseId: string) => void;
 };
 
-export default function ExamSchedule({ exams, conflicts, missingCourses, courseCount }: ExamScheduleProps) {
+export default function ExamSchedule({ exams, conflicts, missingCourses, courseCount, examOnlyCourses = [], onRemoveCourse }: ExamScheduleProps) {
   const id = useId();
   const conflictId = (conflict: ExamConflict) => `${id}-conflict-${encodeURIComponent(conflict.id)}`;
 
@@ -24,6 +27,21 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
 
   return (
     <div className="space-y-8">
+      {examOnlyCourses.length > 0 && (
+        <ul aria-label="Courses without weekly meetings" className="divide-y divide-border rounded-lg border border-border bg-white">
+          {examOnlyCourses.map((course) => (
+            <li key={course.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium" style={{ color: course.color }}>{course.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">No weekly meetings</p>
+              </div>
+              <button type="button" onClick={() => onRemoveCourse?.(course.id)} aria-label={`Remove ${course.title}`} className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                <Trash2 aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {missingCourses.length > 0 && (
         <p className="rounded-lg border border-border bg-white px-4 py-3 text-sm text-muted-foreground">
           Exam details weren’t saved for {missingCourses.map((course) => course.title).join(", ")}.

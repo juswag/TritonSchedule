@@ -89,6 +89,34 @@ describe("mapOfferingToCourse", () => {
     expect(withoutPrimary?.Final).toBeNull();
   });
 
+  it("retains every primary final room in section exam metadata", () => {
+    const course = classPlannerCourse();
+    const [result] = mapOfferingToCourses({
+      ...course,
+      id: 1,
+      source_key: "test-offering",
+      instructors_search: "Ada Lovelace",
+      tss_module_routes: [],
+      class_planner_sections: [{
+        ...course.sections[0]!,
+        id: 1,
+        tss_event_packages: [],
+        class_planner_section_meetings: [classMeeting, ...["CENTR 101", "CENTR 115"].map((room, index) => ({
+          ...classMeeting,
+          meeting_ordinal: index + 1,
+          meeting_kind: "final",
+          specific_date: "2026-12-07",
+          room_code: room,
+        }))],
+      }],
+    });
+
+    expect(result?.Lecture?.Exams).toEqual([
+      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "final" },
+      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 115", Type: "final" },
+    ]);
+  });
+
   it("maps every primary section and meeting group into the course API shape", () => {
     const offering = {
       id: 401,
