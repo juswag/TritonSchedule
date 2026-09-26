@@ -74,7 +74,12 @@ describe("exam schedule", () => {
   it("does not flag the same course sitting listed in multiple rooms as a conflict", () => {
     const course = examCourse("CSE 11", "2026-10-27 7:00pm-9:00pm");
     course.exams!.push({ ...course.exams![0], id: "overflow-room", location: "SOLIS 107" });
-    expect(getExamSchedule([course]).conflicts).toEqual([]);
+    const result = getExamSchedule([course]);
+    expect(result.conflicts).toEqual([]);
+    expect(result.exams).toHaveLength(1);
+    expect(result.exams[0].location).toBe("CENTR 101, SOLIS 107");
+    const otherCourse = examCourse("MATH 20A", "2026-10-27 8:00pm-9:30pm");
+    expect(getExamSchedule([course, otherCourse]).conflicts).toHaveLength(1);
   });
 
   it.each([
@@ -106,5 +111,24 @@ describe("exam schedule", () => {
       { ...course.midtermSections![1], type: "midterm" },
       { ...course.finalSection, type: "final" },
     ]);
+  });
+
+  it("keeps unknown sittings distinct and never guesses an overlap", () => {
+    const course = examCourse("CSE 11", "TBA");
+    course.exams!.push({ ...course.exams![0], id: "second-midterm", name: "Midterm 2", location: "" });
+    const result = getExamSchedule([course, examCourse("MATH 20A", "TBA"), examCourse("PHYS 2A", "2026-10-27 19:00-21:00")]);
+    expect(result.exams).toHaveLength(4);
+    expect(result.exams[0].courseCode).toBe("PHYS 2A");
+    expect(result.exams.filter((exam) => exam.start === null)).toHaveLength(3);
+    expect(result.exams.some((exam) => exam.location === "TBA")).toBe(true);
+    expect(result.conflicts).toEqual([]);
+    expect(parseExamSchedule("").timeLabel).toBe("Time TBA");
+  });
+
+  it("uses legacy sample exam labels and includes only chosen lab metadata", () => {
+    const course: Course = { id: "sample", name: "CSE 11", instructor: "", description: "", color: "blue", schedule: "TBA", midterm: "Oct 27", final: "Dec 7" };
+    const lab = { id: "lab", name: "Lab", time: "Mon 9:00am-10:00am", location: "Room", exams: [{ id: "lab-exam", name: "Lab final", type: "final" as const, time: "TBA", location: "Room" }] };
+    expect(getCourseExams(course, undefined, lab).map((exam) => exam.time)).toEqual(["Oct 27", "Dec 7", "TBA"]);
+    expect(getCourseExams({ ...course, midterm: undefined, final: undefined })).toEqual([]);
   });
 });

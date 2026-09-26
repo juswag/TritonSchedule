@@ -69,3 +69,40 @@ describe("exam tab", () => {
     expect(screen.getByText("Add courses to see their exam details")).toBeInTheDocument();
   });
 });
+
+describe("schedule compatibility", () => {
+  beforeEach(() => localStorage.clear());
+  it("places a cross-type notice once after the final and counts distinct pairs", () => {
+    const overlapping = courses.slice(0, 3).map((course, index) => ({
+      ...course,
+      exams: [{ ...course.exams![0], type: index === 0 ? "final" as const : "midterm" as const, time: "2026-12-07 8:00am-11:00am" }],
+    }));
+    mount(overlapping);
+    expect(screen.getByText("3 conflicts")).toBeInTheDocument();
+    openExams();
+    const finals = screen.getByRole("table", { name: "Finals" });
+    expect(within(finals).getAllByText(/ overlap$/)).toHaveLength(2);
+    expect(within(screen.getByRole("table", { name: "Midterms" })).getAllByText(/ overlap$/)).toHaveLength(1);
+  });
+  it("keeps personal events editable and out of the exam list", () => {
+    mount([
+      { id: "lunch", title: "Lunch", dayOfWeek: "Mon", startTime: "12:00", endTime: "13:00", color: "blue" },
+      { id: "study", title: "Study group", dayOfWeek: "Tue", startTime: "19:00", endTime: "20:30", color: "green", location: "Library" },
+      { id: "call", title: "Quick call", dayOfWeek: "Mon", startTime: "08:00", endTime: "08:15", color: "purple" },
+    ]);
+    expect(screen.getByTitle(/^Lunch/)).toHaveTextContent("12:00 PM");
+    expect(screen.getByTitle(/^Study group/)).toHaveTextContent("7:00 PM");
+    fireEvent.click(screen.getByRole("button", { name: "Tue" }));
+    expect(screen.getByText("Library", { selector: "p" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove Study group" })[0]);
+    expect(screen.queryByTitle(/^Study group/)).not.toBeInTheDocument();
+    openExams();
+    expect(screen.getByText("Add courses to see their exam details")).toBeInTheDocument();
+  });
+  it.each(["not json", "null", "{}", '[{"id":123}]'])("recovers safely from invalid stored schedules: %s", (stored) => {
+    localStorage.setItem("calendarEvents", stored);
+    render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
+    openExams();
+    expect(screen.getByText("Add courses to see their exam details")).toBeInTheDocument();
+  });
+});

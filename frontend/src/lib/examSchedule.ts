@@ -110,18 +110,28 @@ export function getExamSchedule(events: CalendarEvent[]): {
       missingCourses.push({ id: courseId, title: courseTitle });
       continue;
     }
-    const seen = new Set<string>();
+    const sittings = new Map<string, ScheduledExam>();
     for (const exam of saved.exams!.filter(isExam)) {
-      const key = JSON.stringify([exam.type, exam.time, exam.location]);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      exams.push({
+      const schedule = parseExamSchedule(exam.time);
+      const key = JSON.stringify([exam.type, schedule.start ?? exam.time, schedule.end,
+        schedule.start === null ? exam.id : null]);
+      const existing = sittings.get(key);
+      const location = exam.location.trim() || "TBA";
+      if (existing) {
+        const rooms = new Set(existing.location.split(", "));
+        rooms.add(location);
+        existing.location = [...rooms].join(", ");
+        continue;
+      }
+      const sitting: ScheduledExam = {
         ...exam,
         id: JSON.stringify([courseId, exam.id, key]),
         courseId, courseTitle, courseCode: getCourseCode(courseTitle), color: course.color,
-        location: exam.location.trim() || "TBA",
-        ...parseExamSchedule(exam.time),
-      });
+        location,
+        ...schedule,
+      };
+      sittings.set(key, sitting);
+      exams.push(sitting);
     }
   }
   exams.sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity)
