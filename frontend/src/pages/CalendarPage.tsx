@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { MapPin, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, MapPin, Plus, Trash2 } from "lucide-react";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { cn } from "@/lib/utils";
 import { getCourseCode } from "@/lib/courseLabels";
+import { getExamSchedule } from "@/lib/examSchedule";
+import ExamSchedule from "@/components/ExamSchedule";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const HOUR_HEIGHT = 64;
 const GRID_TOP_GUTTER = 16;
@@ -48,12 +51,17 @@ function findOverlappingEvents(event: CalendarEvent, allEvents: CalendarEvent[])
 }
 
 export default function CalendarPage() {
-  const { events, deleteEventsByCourseId, deleteEvent } = useCalendar();
+  const { events, examOnlyCourses, deleteEventsByCourseId, deleteEvent } = useCalendar();
+  const [activeTab, setActiveTab] = useState("weekly");
+  const examSchedule = useMemo(() => getExamSchedule(events, examOnlyCourses), [events, examOnlyCourses]);
   const [selectedMobileDay, setSelectedMobileDay] = useState<Weekday>("Mon");
 
   const courseCount = useMemo(
-    () => new Set(events.filter((event) => event.isCourse).map((event) => event.courseId || event.id)).size,
-    [events]
+    () => new Set([
+      ...events.filter((event) => event.isCourse).map((event) => event.courseId || event.id),
+      ...examOnlyCourses.map((course) => course.id),
+    ]).size,
+    [events, examOnlyCourses]
   );
 
   const removeEvent = (event: CalendarEvent) => {
@@ -75,8 +83,10 @@ export default function CalendarPage() {
       <div className="mx-auto w-full max-w-[1440px]">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-medium text-muted-foreground">Monday through Friday</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-foreground">Weekly schedule</h1>
+            <h1 className="text-2xl font-semibold tracking-[-0.025em] text-foreground">Your schedule</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {activeTab === "weekly" ? "Monday through Friday" : "Exams for your selected courses"}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
@@ -92,6 +102,22 @@ export default function CalendarPage() {
           </div>
         </div>
 
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList aria-label="Schedule views" className="mb-6 h-auto w-full justify-start gap-2 rounded-none border-b border-border bg-transparent p-0">
+            <TabsTrigger value="weekly" className="rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
+              Weekly classes
+            </TabsTrigger>
+            <TabsTrigger value="exams" className="gap-2 rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
+              Exams
+              {examSchedule.conflicts.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
+                  {examSchedule.conflicts.length} {examSchedule.conflicts.length === 1 ? "conflict" : "conflicts"}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="weekly" className="mt-0">
         <div className="overflow-hidden rounded-lg border border-border bg-white">
           <div className="sm:hidden">
             <div className="grid grid-cols-5 border-b border-border">
@@ -254,6 +280,11 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
+          </TabsContent>
+          <TabsContent value="exams" className="mt-0">
+            <ExamSchedule {...examSchedule} courseCount={courseCount} examOnlyCourses={examOnlyCourses} onRemoveCourse={deleteEventsByCourseId} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

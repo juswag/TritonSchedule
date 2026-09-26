@@ -4,6 +4,7 @@ import {
   isExactProfessorMatch,
   mapOfferingToCourses,
 } from "../../src/services/supabaseRepository.js";
+import { classPlannerCourse } from "../ingestion/classPlannerFixtures.js";
 
 const classMeeting = {
   meeting_ordinal: 0,
@@ -24,6 +25,98 @@ const classMeeting = {
 };
 
 describe("mapOfferingToCourse", () => {
+  it("keeps exams scoped to their primary section without leaking optional section exams", () => {
+    const course = classPlannerCourse();
+    const makeSection = (index: number, kind: string, examDates: string[]) => ({
+      ...course.sections[0]!,
+      id: index,
+      section_ref: `FA26:E ${index}`,
+      section_code: `${index}-000`,
+      instruction_type_name: kind,
+      tss_event_packages: [{ event_package_id: "shared-package", tss_booking_url: null }],
+      class_planner_section_meetings: [
+        classMeeting,
+        ...examDates.map((date, ordinal) => ({
+          ...classMeeting,
+          meeting_ordinal: ordinal + 1,
+          meeting_kind: ordinal === 0 ? "midterm" : "final",
+          specific_date: date,
+        })),
+      ],
+    });
+    const offering = {
+      ...course,
+      id: 1,
+      source_key: "test-offering",
+      instructors_search: "Ada Lovelace",
+      tss_module_routes: [],
+      class_planner_sections: [
+        makeSection(1, "lecture", ["2026-10-27", "2026-12-07"]),
+        makeSection(2, "lecture", ["2026-10-28", "2026-12-08"]),
+        makeSection(3, "lecture", []),
+        makeSection(4, "discussion", ["2026-10-29", "2026-12-09"]),
+        makeSection(5, "lab", ["2026-10-30", "2026-12-10"]),
+      ],
+    };
+
+    const result = mapOfferingToCourses(offering);
+
+    expect(result).toHaveLength(3);
+    expect(result[0]?.Midterms).toEqual([
+      { Days: "2026-10-27", Time: "5:00pm-6:20pm", Location: "CENTR 101" },
+    ]);
+    expect(result[0]?.Final?.Days).toBe("2026-12-07");
+    expect(result[1]?.Midterms).toEqual([
+      { Days: "2026-10-28", Time: "5:00pm-6:20pm", Location: "CENTR 101" },
+    ]);
+    expect(result[1]?.Final?.Days).toBe("2026-12-08");
+    expect(result[2]?.Midterms).toEqual([]);
+    expect(result[2]?.Final).toBeNull();
+    expect(result[0]?.Discussions[0]?.Exams).toEqual([
+      { Days: "2026-10-29", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "midterm" },
+      { Days: "2026-12-09", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "final" },
+    ]);
+    expect(result[0]?.Labs[0]?.Exams).toEqual([
+      { Days: "2026-10-30", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "midterm" },
+      { Days: "2026-12-10", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "final" },
+    ]);
+
+    const [withoutPrimary] = mapOfferingToCourses({
+      ...offering,
+      class_planner_sections: [offering.class_planner_sections[3]!],
+    });
+    expect(withoutPrimary?.Midterms).toEqual([]);
+    expect(withoutPrimary?.Final).toBeNull();
+  });
+
+  it("retains every primary final room in section exam metadata", () => {
+    const course = classPlannerCourse();
+    const [result] = mapOfferingToCourses({
+      ...course,
+      id: 1,
+      source_key: "test-offering",
+      instructors_search: "Ada Lovelace",
+      tss_module_routes: [],
+      class_planner_sections: [{
+        ...course.sections[0]!,
+        id: 1,
+        tss_event_packages: [],
+        class_planner_section_meetings: [classMeeting, ...["CENTR 101", "CENTR 115"].map((room, index) => ({
+          ...classMeeting,
+          meeting_ordinal: index + 1,
+          meeting_kind: "final",
+          specific_date: "2026-12-07",
+          room_code: room,
+        }))],
+      }],
+    });
+
+    expect(result?.Lecture?.Exams).toEqual([
+      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "final" },
+      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 115", Type: "final" },
+    ]);
+  });
+
   it("maps every primary section and meeting group into the course API shape", () => {
     const offering = {
       id: 401,

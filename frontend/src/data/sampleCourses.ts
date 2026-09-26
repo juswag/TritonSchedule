@@ -1,3 +1,5 @@
+import type { CalendarExam } from "@/types/calendar";
+
 export interface DiscussionSection {
   id: string;
   name: string;
@@ -9,6 +11,7 @@ export interface DiscussionSection {
   sectionCode?: string;
   /** TSS event packages that contain this section. */
   eventPackageIds?: string[];
+  exams?: CalendarExam[];
 }
 
 export interface CourseExamSection {
@@ -42,6 +45,8 @@ export interface Course {
   rmpProfileUrl?: string;
   discussionSections?: DiscussionSection[];
   labSections?: DiscussionSection[];
+  /** Complete primary-section exams; undefined for older catalog responses. */
+  exams?: CalendarExam[];
   midtermSections?: CourseExamSection[];
   finalSection?: CourseExamSection | null;
   midterm?: string;

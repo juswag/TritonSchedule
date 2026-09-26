@@ -21,6 +21,7 @@ import { Course, CourseExamSection, DiscussionSection } from "@/data/sampleCours
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { getCourseCode } from "@/lib/courseLabels";
+import { getCourseExams } from "@/lib/examSchedule";
 import { cn } from "@/lib/utils";
 import { getProfessorProfileUrl, normalizeProfessorProfileUrl } from "@/lib/professorProfile";
 import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConflicts";
@@ -110,7 +111,7 @@ function createApiRequestInit(signal: AbortSignal): RequestInit {
 }
 
 export default function SearchCourses() {
-  const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v4";
+  const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? sessionStorage.getItem("searchCoursesQuery") ?? "";
   const [searchQuery, setSearchQuery] = useState(() =>
@@ -149,7 +150,7 @@ export default function SearchCourses() {
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
   const [selectedLabIds, setSelectedLabIds] = useState<Record<string, string>>({});
-  const { events, addEvent } = useCalendar();
+  const { events, examOnlyCourses, addEvent, addExamOnlyCourse } = useCalendar();
 
   useEffect(() => {
     sessionStorage.setItem("searchCoursesQuery", searchQuery);
@@ -259,11 +260,10 @@ export default function SearchCourses() {
 
   const addedCourseIds = useMemo(() => {
     return new Set(
-      events
-        .filter((e) => e.isCourse)
-        .map((e) => e.courseId || e.id)
+      [...events.filter((e) => e.isCourse).map((e) => e.courseId || e.id),
+        ...examOnlyCourses.map((course) => course.id)]
     );
-  }, [events]);
+  }, [events, examOnlyCourses]);
 
   const selectedCourse = useMemo(
     () => displayedCourses.find((course) => course.id === selectedCourseId) ?? displayedCourses[0] ?? null,
@@ -360,6 +360,11 @@ export default function SearchCourses() {
     [candidateScheduleEvents, scheduledEvents]
   );
 
+  const canSaveExamOnly = Boolean(selectedCourse
+    && getCourseExams(selectedCourse, selectedDiscussion, selectedLab).length > 0
+    && (!selectedCourse.discussionSections?.length || selectedDiscussion)
+    && (!selectedCourse.labSections?.length || selectedLab));
+
   const handleAddToCalendar = (
     course: Course,
     selectedDiscussion?: DiscussionSection,
@@ -375,8 +380,14 @@ export default function SearchCourses() {
     ];
     const otherScheduledEvents = events.filter((event) => event.courseId !== course.id);
 
+    const exams = getCourseExams(course, selectedDiscussion, selectedLab);
     if (eventsToAdd.length === 0) {
-      toast.error("Could not parse this course schedule for calendar placement.");
+      if (canSaveExamOnly) {
+        addExamOnlyCourse({ id: course.id, title: course.name, color: calendarColor, exams });
+        toast.success(`${course.name} exams added to your calendar!`);
+      } else {
+        toast.error("Could not parse this course schedule for calendar placement.");
+      }
       return;
     }
 
@@ -385,7 +396,7 @@ export default function SearchCourses() {
       return;
     }
 
-    eventsToAdd.forEach(addEvent);
+    eventsToAdd.forEach((event) => addEvent({ ...event, courseTitle: course.name, exams }));
 
     const selectedSections = [selectedDiscussion?.name, selectedLab?.name].filter(
       (name): name is string => Boolean(name)
@@ -729,7 +740,7 @@ export default function SearchCourses() {
                     disabled={
                       addedCourseIds.has(selectedCourse.id) ||
                       conflictingScheduledEvents.length > 0 ||
-                      candidateScheduleEvents.length === 0
+                      (candidateScheduleEvents.length === 0 && !canSaveExamOnly)
                     }
                     onClick={() =>
                       handleAddToCalendar(
@@ -1412,7 +1423,18 @@ type BackendSection = {
   SectionRef?: string;
   SectionCode?: string;
   EventPackageIds?: string[];
+  Exams?: Array<{ Type: "midterm" | "final"; Days?: string; Time?: string; Location?: string }>;
 };
+
+function mapSectionExams(section: BackendSection, sectionId: string) {
+  return (section.Exams ?? []).map((exam, index) => ({
+    id: `${sectionId}-exam-${index}`,
+    name: exam.Type === "final" ? "Final" : "Midterm",
+    type: exam.Type,
+    time: `${exam.Days ?? ""} ${exam.Time ?? ""}`.trim() || "TBA",
+    location: exam.Location?.trim() || "TBA",
+  }));
+}
 
 type BackendCourse = {
   id?: string | number;
@@ -1464,6 +1486,9 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       ? [lecture]
       : [];
   const lectureDays = lecture?.Days?.trim() ?? "";
+  // Each recurring meeting group carries the same primary-section exam list.
+  const primaryExamSection = lectures.find((meeting) => Array.isArray(meeting.Exams))
+    ?? (Array.isArray(lecture?.Exams) ? lecture : undefined);
   const lectureTime = lecture?.Time?.trim() ?? "";
   const lectureSchedule = `${lectureDays} ${lectureTime}`.trim();
   const name = course.Name ?? course.name ?? "Untitled Course";
@@ -1493,6 +1518,9 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       eventPackageIds: meeting.EventPackageIds,
     })),
     lectureSectionRef: lecture?.SectionRef,
+    exams: primaryExamSection
+      ? mapSectionExams(primaryExamSection, `${course.id ?? index}-lecture`)
+      : undefined,
     lectureEventPackageIds: lecture?.EventPackageIds,
     sectionCode: course.SectionCode,
     tssPackageUrls: course.TssPackageUrls,
@@ -1514,6 +1542,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       sectionRef: section.SectionRef,
       sectionCode: section.SectionCode,
       eventPackageIds: section.EventPackageIds,
+      exams: mapSectionExams(section, `${course.id ?? index}-discussion-${sectionIndex}`),
     })),
     labSections: labs.map((section, sectionIndex) => ({
       id: `${index}-lab-${sectionIndex}`,
@@ -1523,6 +1552,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       sectionRef: section.SectionRef,
       sectionCode: section.SectionCode,
       eventPackageIds: section.EventPackageIds,
+      exams: mapSectionExams(section, `${course.id ?? index}-lab-${sectionIndex}`),
     })),
     midtermSections: midterms
       .filter((midterm) => {
