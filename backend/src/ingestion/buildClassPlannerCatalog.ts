@@ -6,7 +6,7 @@ import type {
   ClassPlannerResolvedRoute,
   ClassPlannerSection,
 } from "../models/ClassPlannerCatalog.js";
-import type { Section } from "../models/Section.js";
+import type { Section, SectionExam } from "../models/Section.js";
 import { normalizeTeacherKey } from "../utils/normalizeTeacherKey.js";
 
 const TSS_EVENT_PACKAGE_ROUTE =
@@ -279,6 +279,12 @@ export function buildLegacySections(
       SectionRef: section.section_ref,
       SectionCode: section.section_code,
       EventPackageIds: section.event_package_ids,
+      Exams: uniqueMeetings(section.meetings.filter(
+        ({ meeting_kind }) => meeting_kind.toLowerCase() !== "class",
+      )).map((meeting): SectionExam => ({
+        ...toLegacyMeeting(meeting),
+        Type: meeting.meeting_kind.toLowerCase() === "final" ? "final" : "midterm",
+      })),
     };
     const classMeetings = section.meetings.filter(
       ({ meeting_kind }) => meeting_kind === "class",

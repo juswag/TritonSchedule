@@ -9,6 +9,18 @@ export interface CalendarEvent {
   courseId?: string;
   eventType?: string;
   location?: string;
+  /** Original course label, shared by lecture and section events. */
+  courseTitle?: string;
+  /** Undefined on schedules saved before exam metadata was supported. */
+  exams?: CalendarExam[];
+}
+
+export interface CalendarExam {
+  id: string;
+  name: string;
+  type: "midterm" | "final";
+  time: string;
+  location: string;
 }
 
 export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri";

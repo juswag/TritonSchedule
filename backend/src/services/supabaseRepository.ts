@@ -156,6 +156,12 @@ export function mapOfferingToCourses(
     : undefined;
 
   return sectionChoices.map((primarySection) => {
+    // Other primary sections and optional discussions can have different exams.
+    // Only publish exams belonging to the section represented by this course.
+    const sectionCourse = buildLegacyCourses(row.term_code, [{
+      ...classPlannerCourse,
+      sections: primarySection ? [primarySection] : [],
+    }])[0]!;
     const lectures = primarySection
       ? buildLegacySections([primarySection])
       : [];
@@ -173,6 +179,8 @@ export function mapOfferingToCourses(
 
     return {
       ...baseCourse,
+      Midterms: sectionCourse.Midterms,
+      Final: sectionCourse.Final,
       id: primarySection?.section_ref ?? `${row.term_code}:${row.source_key}`,
       Teacher: teacher,
       Lecture: lectures[0] ?? null,

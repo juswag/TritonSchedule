@@ -21,6 +21,7 @@ import { Course, CourseExamSection, DiscussionSection } from "@/data/sampleCours
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { getCourseCode } from "@/lib/courseLabels";
+import { getCourseExams } from "@/lib/examSchedule";
 import { cn } from "@/lib/utils";
 import { getProfessorProfileUrl, normalizeProfessorProfileUrl } from "@/lib/professorProfile";
 import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConflicts";
@@ -110,7 +111,7 @@ function createApiRequestInit(signal: AbortSignal): RequestInit {
 }
 
 export default function SearchCourses() {
-  const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v4";
+  const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? sessionStorage.getItem("searchCoursesQuery") ?? "";
   const [searchQuery, setSearchQuery] = useState(() =>
@@ -385,7 +386,8 @@ export default function SearchCourses() {
       return;
     }
 
-    eventsToAdd.forEach(addEvent);
+    const exams = getCourseExams(course, selectedDiscussion, selectedLab);
+    eventsToAdd.forEach((event) => addEvent({ ...event, courseTitle: course.name, exams }));
 
     const selectedSections = [selectedDiscussion?.name, selectedLab?.name].filter(
       (name): name is string => Boolean(name)
@@ -1412,7 +1414,18 @@ type BackendSection = {
   SectionRef?: string;
   SectionCode?: string;
   EventPackageIds?: string[];
+  Exams?: Array<{ Type: "midterm" | "final"; Days?: string; Time?: string; Location?: string }>;
 };
+
+function mapSectionExams(section: BackendSection, sectionId: string) {
+  return (section.Exams ?? []).map((exam, index) => ({
+    id: `${sectionId}-exam-${index}`,
+    name: exam.Type === "final" ? "Final" : "Midterm",
+    type: exam.Type,
+    time: `${exam.Days ?? ""} ${exam.Time ?? ""}`.trim() || "TBA",
+    location: exam.Location?.trim() || "TBA",
+  }));
+}
 
 type BackendCourse = {
   id?: string | number;
@@ -1514,6 +1527,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       sectionRef: section.SectionRef,
       sectionCode: section.SectionCode,
       eventPackageIds: section.EventPackageIds,
+      exams: mapSectionExams(section, `${course.id ?? index}-discussion-${sectionIndex}`),
     })),
     labSections: labs.map((section, sectionIndex) => ({
       id: `${index}-lab-${sectionIndex}`,
@@ -1523,6 +1537,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       sectionRef: section.SectionRef,
       sectionCode: section.SectionCode,
       eventPackageIds: section.EventPackageIds,
+      exams: mapSectionExams(section, `${course.id ?? index}-lab-${sectionIndex}`),
     })),
     midtermSections: midterms
       .filter((midterm) => {
