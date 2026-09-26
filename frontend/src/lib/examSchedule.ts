@@ -130,7 +130,8 @@ export function getExamSchedule(events: CalendarEvent[], examOnlyCourses: Calend
       if (existing) {
         const rooms = new Set(existing.location.split(", "));
         rooms.add(location);
-        existing.location = [...rooms].join(", ");
+        const knownRooms = [...rooms].filter((room) => !/^(TBA|TBD)$/i.test(room));
+        existing.location = knownRooms.length ? knownRooms.join(", ") : "TBA";
         continue;
       }
       const sitting: ScheduledExam = {

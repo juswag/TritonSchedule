@@ -153,4 +153,12 @@ describe("exam schedule", () => {
     expect(getExamSchedule([weekly], []).conflicts).toEqual([]);
   });
 
+  it.each(["TBA", "TBD", ""])("omits unknown room %s when the same sitting has a known room", (unknown) => {
+    const course = examCourse("CSE 11", "2026-10-27 19:00-21:00");
+    course.exams!.push({ ...course.exams![0], id: "other-room", location: unknown });
+    expect(getExamSchedule([course]).exams[0].location).toBe("CENTR 101");
+    course.exams!.reverse();
+    expect(getExamSchedule([course]).exams[0].location).toBe("CENTR 101");
+  });
+
 });
