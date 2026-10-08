@@ -132,8 +132,18 @@ export function buildClassPlannerCatalog(
       });
 
       section.meetings.forEach((meeting, meetingOrdinal) => {
+        // Class Planner uses midnight-to-midnight as an unknown-time placeholder.
+        // A TBA flag alone can accompany real times, so preserve every other interval.
+        const hasTbaTimePlaceholder = meeting.is_tba &&
+          meeting.start_minutes === 0 && meeting.end_minutes === 0;
         meetings.push({
           ...meeting,
+          ...(hasTbaTimePlaceholder ? {
+            start_minutes: null,
+            end_minutes: null,
+            start_time_display: null,
+            end_time_display: null,
+          } : {}),
           term_code: term,
           section_id: section.section_id,
           meeting_ordinal: meetingOrdinal,
