@@ -53,6 +53,7 @@ jobs:
       - name: Ingest catalog
         working-directory: backend
         env:
+          CLASS_PLANNER_SESSION_COOKIE: ${{ secrets.CLASS_PLANNER_SESSION_COOKIE }}
           INGESTION_TERM: ${{ inputs.term || '' }}
           PROFESSOR_MODE: ${{ inputs.professors || 'auto' }}
         run: npm run ingest -- --term="$INGESTION_TERM" --professors="$PROFESSOR_MODE"

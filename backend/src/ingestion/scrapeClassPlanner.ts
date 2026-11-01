@@ -40,21 +40,32 @@ type ScheduleResponse = Readonly<{
 
 export type ScrapeClassPlannerDependencies = Readonly<{
   fetch: ClassPlannerFetch;
+  sessionCookie?: string;
 }>;
-
-const productionDependencies: ScrapeClassPlannerDependencies = {
-  fetch: globalThis.fetch,
-};
 
 export async function scrapeClassPlanner(
   requestedTerm?: string,
-  dependencies: ScrapeClassPlannerDependencies = productionDependencies,
+  dependencies: ScrapeClassPlannerDependencies = {
+    fetch: globalThis.fetch,
+    sessionCookie: process.env.CLASS_PLANNER_SESSION_COOKIE,
+  },
 ): Promise<ClassPlannerScrape> {
+  const sessionCookie = dependencies.sessionCookie;
+  if (sessionCookie && /[\r\n]/.test(sessionCookie)) {
+    throw new Error("CLASS_PLANNER_SESSION_COOKIE must be a single-line Cookie header value");
+  }
+
+  // Keep the session scoped to this scrape, including pagination and route requests.
+  const fetcher: ClassPlannerFetch = (url, init) => {
+    const headers = new Headers(init?.headers);
+    if (sessionCookie?.trim()) headers.set("Cookie", sessionCookie.trim());
+    return dependencies.fetch(url, { ...init, headers });
+  };
   const term = requestedTerm
     ? normalizeTerm(requestedTerm)
-    : await fetchLatestTerm(dependencies.fetch);
-  const courses = await fetchAllCourses(term, dependencies.fetch);
-  const routes = await resolveRoutes(term, courses, dependencies.fetch);
+    : await fetchLatestTerm(fetcher);
+  const courses = await fetchAllCourses(term, fetcher);
+  const routes = await resolveRoutes(term, courses, fetcher);
 
   return { term, courses, routes };
 }
@@ -227,11 +238,22 @@ async function fetchJson<T>(
   for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt += 1) {
     const response = await fetcher(url, {
       headers: { Accept: "application/json" },
+      // A sign-in redirect is not catalog data. Do not forward session credentials.
+      redirect: "manual",
       signal: AbortSignal.timeout(30_000),
     });
 
     if (response.ok) {
       return response.json() as Promise<T>;
+    }
+
+    if (response.status === 401 || response.status === 403 ||
+        (response.status >= 300 && response.status < 400)) {
+      throw new Error(
+        `Class Planner access failed (HTTP ${response.status}). ` +
+        "Set or refresh CLASS_PLANNER_SESSION_COOKIE with an authorized Class Planner session. " +
+        "See README.md for nightly ingestion setup.",
+      );
     }
 
     const retryable = response.status === 429 || response.status >= 500;

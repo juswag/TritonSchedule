@@ -7,6 +7,9 @@ import {
 import { ProfessorEnrichmentUnavailableError } from "../../src/ingestion/enrichCoursesWithRatings.js";
 import type { ClassPlannerCatalogSnapshot } from "../../src/models/ClassPlannerCatalog.js";
 import type { Course } from "../../src/models/Course.js";
+import { ingestCatalog } from "../../src/ingestion/ingestCatalog.js";
+import { scrapeClassPlanner } from "../../src/ingestion/scrapeClassPlanner.js";
+import { classPlannerCourse } from "./classPlannerFixtures.js";
 
 const catalog: ClassPlannerCatalogSnapshot = {
   event_packages: [],
@@ -65,6 +68,40 @@ function dependencies(
 }
 
 describe("runCatalogIngestion", () => {
+  it("keeps the published catalog when the session expires during route lookup", async () => {
+    const publishCatalog = jest.fn<CatalogIngestionDependencies["publishCatalog"]>();
+    const completeRun = jest.fn<CatalogIngestionDependencies["completeRun"]>();
+    const failRun = jest.fn<CatalogIngestionDependencies["failRun"]>();
+    const sessionCookie = "planner_session=expired-secret";
+
+    await expect(runCatalogIngestion(
+      { professorMode: "never", requestedTerm: "FA26", trigger: "schedule" },
+      dependencies({
+        publishCatalog,
+        completeRun,
+        failRun,
+        ingest: (term) => ingestCatalog(term, {
+          scrapeClassPlanner: (requestedTerm) => scrapeClassPlanner(requestedTerm, {
+            sessionCookie,
+            fetch: async (url) => url.includes("/catalog/courses?")
+              ? Response.json({
+                total: 1, offset: 0, limit: 48, courses: [classPlannerCourse(101)],
+              })
+              : new Response(null, { status: 401 }),
+          }),
+        }),
+      }),
+    )).rejects.toThrow("Set or refresh CLASS_PLANNER_SESSION_COOKIE");
+
+    expect(publishCatalog).not.toHaveBeenCalled();
+    expect(completeRun).not.toHaveBeenCalled();
+    expect(failRun).toHaveBeenCalledWith(expect.objectContaining({
+      catalogPublished: false,
+      error: expect.stringContaining("Set or refresh CLASS_PLANNER_SESSION_COOKIE"),
+    }));
+    expect(JSON.stringify(failRun.mock.calls)).not.toContain(sessionCookie);
+  });
+
   it("publishes the catalog before starting professor enrichment", async () => {
     const calls: string[] = [];
     const result = await runCatalogIngestion(
