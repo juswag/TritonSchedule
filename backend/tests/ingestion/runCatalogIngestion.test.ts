@@ -68,11 +68,10 @@ function dependencies(
 }
 
 describe("runCatalogIngestion", () => {
-  it("keeps the published catalog when the session expires during route lookup", async () => {
+  it("keeps the published catalog when a public catalog page fails", async () => {
     const publishCatalog = jest.fn<CatalogIngestionDependencies["publishCatalog"]>();
     const completeRun = jest.fn<CatalogIngestionDependencies["completeRun"]>();
     const failRun = jest.fn<CatalogIngestionDependencies["failRun"]>();
-    const sessionCookie = "planner_session=expired-secret";
 
     await expect(runCatalogIngestion(
       { professorMode: "never", requestedTerm: "FA26", trigger: "schedule" },
@@ -82,24 +81,23 @@ describe("runCatalogIngestion", () => {
         failRun,
         ingest: (term) => ingestCatalog(term, {
           scrapeClassPlanner: (requestedTerm) => scrapeClassPlanner(requestedTerm, {
-            sessionCookie,
-            fetch: async (url) => url.includes("/catalog/courses?")
+            fetch: async (_url, init) => JSON.parse(String(init?.body)).offset === 0
               ? Response.json({
-                total: 1, offset: 0, limit: 48, courses: [classPlannerCourse(101)],
+                term_code: "FA26", total: 49, offset: 0, limit: 48,
+                courses: Array.from({ length: 48 }, (_, index) => classPlannerCourse(index + 1)),
               })
               : new Response(null, { status: 401 }),
           }),
         }),
       }),
-    )).rejects.toThrow("Set or refresh CLASS_PLANNER_SESSION_COOKIE");
+    )).rejects.toThrow("Public Class Planner access failed");
 
     expect(publishCatalog).not.toHaveBeenCalled();
     expect(completeRun).not.toHaveBeenCalled();
     expect(failRun).toHaveBeenCalledWith(expect.objectContaining({
       catalogPublished: false,
-      error: expect.stringContaining("Set or refresh CLASS_PLANNER_SESSION_COOKIE"),
+      error: expect.stringContaining("Public Class Planner access failed"),
     }));
-    expect(JSON.stringify(failRun.mock.calls)).not.toContain(sessionCookie);
   });
 
   it("publishes the catalog before starting professor enrichment", async () => {

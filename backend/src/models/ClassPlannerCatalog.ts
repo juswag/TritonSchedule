@@ -84,7 +84,7 @@ export type ClassPlannerOfferingRecord = Readonly<{
   subject_code: string;
   course_code: string;
   module_code: string;
-  module_id: string;
+  module_id: string | null;
   module_name: string;
   course_title: string | null;
   section_count: number;
@@ -132,7 +132,7 @@ export type ClassPlannerMeetingRecord = ClassPlannerMeeting &
 export type ClassPlannerEventPackageRecord = Readonly<{
   source_key: string;
   term_code: string;
-  module_id: string;
+  module_id: string | null;
   event_package_id: string;
   tss_booking_url: string | null;
 }>;

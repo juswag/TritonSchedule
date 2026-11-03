@@ -16,35 +16,39 @@
 
 ## Nightly catalog ingestion
 
-The `Nightly catalog ingestion` workflow reads UCSD Class Planner and publishes
-the catalog using the existing `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
-repository secrets. Class Planner now requires UCSD sign-in: anonymous requests
-to `/api/v1/planner/terms` return HTTP 401, and `/start` redirects to login.
+The nightly workflow reads the unauthenticated Class Planner public catalog:
 
-For session-based access, set the repository Actions secret
-`CLASS_PLANNER_SESSION_COOKIE` to the Cookie header value from an authorized,
-signed-in Class Planner API request. Supply only the cookie name/value pairs,
-not a `Cookie:` prefix, `Set-Cookie` attributes, or a UCSD password. Use only a
-session authorized for this ingestion. The workflow exposes it only to the
-ingestion step; do not commit it or paste it into logs or issues.
+- `GET https://classplanner.apps.ucsd.edu/api/v1/public/catalog/terms`
+- `POST https://classplanner.apps.ucsd.edu/api/v1/public/catalog/courses/search`
 
-For local ingestion, provide the same variable through the process environment
-or an untracked `backend/.env`, then run:
+Only the existing `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` repository
+secrets are needed. No UCSD session cookie or automated sign-in is used.
+
+Apply `20261103220246_allow_public_catalog_without_tss_routes.sql` before running
+this ingestion version. It makes the TSS module ID nullable on offerings and
+packages; all other table constraints and atomic publication remain in place.
+
+The scraper uses the search response's total for pagination and rejects empty,
+incomplete, inconsistent, or duplicate results before publication. A failed
+refresh preserves the last published catalog. Term-summary counts can differ
+from search totals and are not used to size the scrape.
+
+Courses, sections, instructors, enrollment counts, weekly meetings, exams, and
+package memberships are retained. The public feed does not supply TSS module
+IDs, booking URLs, or room/building details. Those fields are stored as null,
+and no module-route rows are created. A successful refresh replaces previous
+location and route data rather than retaining potentially stale values.
+The app continues to support course search and calendar planning; it shows
+unknown locations as TBA and disables unavailable TSS links.
+
+Available terms and data freshness depend on UCSD. A successful scrape does not
+prove that seat counts were refreshed at the same time.
+
+After applying migrations and configuring the existing database environment,
+run ingestion locally or dispatch the nightly workflow manually:
 
 ```sh
 cd backend
 npm ci
 npm run ingest -- --professors=never
 ```
-
-The scraper includes the session on term discovery, all catalog pages, and TSS
-route lookups. Authentication errors and redirects fail the run before catalog
-publication, preserving the last published catalog. A missing or expired session
-produces an error naming the secret to set or refresh.
-
-Session cookies expire. This supports a supplied session; it does not automate
-UCSD sign-in, MFA, or session renewal. Reliable unattended access still needs a
-UCSD-approved credential and renewal process. A passing unit-test run does not
-verify that a supplied session is accepted by UCSD. After configuring the secret,
-run the workflow manually and check catalog publication before relying on the
-nightly schedule.

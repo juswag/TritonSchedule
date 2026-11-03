@@ -1,14 +1,14 @@
 import type {
   ClassPlannerCourse,
-  ClassPlannerResolvedRoute,
+  ClassPlannerMeeting,
   ClassPlannerScrape,
+  ClassPlannerSection,
   ClassPlannerTerm,
 } from "../models/ClassPlannerCatalog.js";
 import { classPlannerSourceKey } from "./buildClassPlannerCatalog.js";
 
-const CLASS_PLANNER_API = "https://classplanner.apps.ucsd.edu/api/v1";
+const CLASS_PLANNER_API = "https://classplanner.apps.ucsd.edu/api/v1/public/catalog";
 const CATALOG_PAGE_SIZE = 48;
-const ROUTE_BATCH_SIZE = 10;
 const REQUEST_CONCURRENCY = 4;
 const MAX_REQUEST_ATTEMPTS = 3;
 
@@ -18,61 +18,43 @@ export type ClassPlannerFetch = (
   init?: RequestInit,
 ) => Promise<FetchResponse>;
 
+type LocationField = "building_code" | "building_name" | "room_code" | "room_name";
+type PublicMeeting = Omit<ClassPlannerMeeting, LocationField> &
+  Partial<Pick<ClassPlannerMeeting, LocationField>>;
+type PublicCourse = Omit<ClassPlannerCourse, "availability_refresh_pending" | "metadata_source" | "sections"> & {
+  sections: Array<Omit<ClassPlannerSection, "meetings"> & { meetings: PublicMeeting[] }>;
+};
+
 type CatalogPage = Readonly<{
   term_code: string;
   total: number;
   offset: number;
   limit: number;
-  courses: ClassPlannerCourse[];
-}>;
-
-type ScheduleCourseDetail = Readonly<{
-  sections: Array<Readonly<{ section_id: string }>>;
-  module_id: string;
-  event_package_id: string | null;
-  tss_booking_url: string;
-}>;
-
-type ScheduleResponse = Readonly<{
-  valid: boolean;
-  course_details: Record<string, ScheduleCourseDetail>;
+  courses: PublicCourse[];
 }>;
 
 export type ScrapeClassPlannerDependencies = Readonly<{
   fetch: ClassPlannerFetch;
-  sessionCookie?: string;
 }>;
 
 export async function scrapeClassPlanner(
   requestedTerm?: string,
   dependencies: ScrapeClassPlannerDependencies = {
     fetch: globalThis.fetch,
-    sessionCookie: process.env.CLASS_PLANNER_SESSION_COOKIE,
   },
 ): Promise<ClassPlannerScrape> {
-  const sessionCookie = dependencies.sessionCookie;
-  if (sessionCookie && /[\r\n]/.test(sessionCookie)) {
-    throw new Error("CLASS_PLANNER_SESSION_COOKIE must be a single-line Cookie header value");
-  }
-
-  // Keep the session scoped to this scrape, including pagination and route requests.
-  const fetcher: ClassPlannerFetch = (url, init) => {
-    const headers = new Headers(init?.headers);
-    if (sessionCookie?.trim()) headers.set("Cookie", sessionCookie.trim());
-    return dependencies.fetch(url, { ...init, headers });
-  };
   const term = requestedTerm
     ? normalizeTerm(requestedTerm)
-    : await fetchLatestTerm(fetcher);
-  const courses = await fetchAllCourses(term, fetcher);
-  const routes = await resolveRoutes(term, courses, fetcher);
+    : await fetchLatestTerm(dependencies.fetch);
+  const courses = await fetchAllCourses(term, dependencies.fetch);
 
-  return { term, courses, routes };
+  // Public catalog responses do not include authenticated TSS route metadata.
+  return { term, courses, routes: [] };
 }
 
 async function fetchLatestTerm(fetcher: ClassPlannerFetch): Promise<string> {
   const payload = await fetchJson<{ terms: ClassPlannerTerm[] }>(
-    `${CLASS_PLANNER_API}/planner/terms`,
+    `${CLASS_PLANNER_API}/terms`,
     fetcher,
   );
   const latest = payload.terms.find(
@@ -91,6 +73,9 @@ async function fetchAllCourses(
   fetcher: ClassPlannerFetch,
 ): Promise<ClassPlannerCourse[]> {
   const firstPage = await fetchCatalogPage(term, 0, fetcher);
+  if (firstPage.total === 0) {
+    throw new Error(`Public Class Planner returned an empty catalog for ${term}`);
+  }
   const offsets: number[] = [];
 
   for (
@@ -109,7 +94,10 @@ async function fetchAllCourses(
   const pages = [firstPage, ...remainingPages].sort(
     (left, right) => left.offset - right.offset,
   );
-  const courses = pages.flatMap(({ courses }) => courses);
+  if (pages.some(({ total }) => total !== firstPage.total)) {
+    throw new Error(`Public Class Planner catalog changed during pagination for ${term}`);
+  }
+  const courses = pages.flatMap(({ courses }) => courses.map(normalizePublicCourse));
   const sourceKeys = new Set(courses.map(classPlannerSourceKey));
 
   if (courses.length !== firstPage.total) {
@@ -122,6 +110,14 @@ async function fetchAllCourses(
     throw new Error(`Class Planner returned duplicate course offerings for ${term}`);
   }
 
+  if (courses.some((course) => course.term_code !== term)) {
+    throw new Error(`Public Class Planner returned a course from a different term than ${term}`);
+  }
+  const sectionIds = courses.flatMap(({ sections }) => sections.map(({ section_id }) => section_id));
+  if (new Set(sectionIds).size !== sectionIds.length) {
+    throw new Error(`Public Class Planner returned duplicate section IDs for ${term}`);
+  }
+
   return courses;
 }
 
@@ -130,95 +126,43 @@ async function fetchCatalogPage(
   offset: number,
   fetcher: ClassPlannerFetch,
 ): Promise<CatalogPage> {
-  const query = new URLSearchParams({
-    term_code: term,
-    offset: String(offset),
-    limit: String(CATALOG_PAGE_SIZE),
-    sort: "course_code",
-    direction: "asc",
-  });
-
-  return fetchJson<CatalogPage>(
-    `${CLASS_PLANNER_API}/catalog/courses?${query}`,
+  const page = await fetchJson<CatalogPage>(
+    `${CLASS_PLANNER_API}/courses/search`,
     fetcher,
-  );
-}
-
-async function resolveRoutes(
-  term: string,
-  courses: readonly ClassPlannerCourse[],
-  fetcher: ClassPlannerFetch,
-): Promise<ClassPlannerResolvedRoute[]> {
-  const coursesWithSections = courses.filter(({ sections }) => sections.length > 0);
-  const sourceKeyByRepresentativeSection = new Map<string, string>();
-
-  for (const course of coursesWithSections) {
-    sourceKeyByRepresentativeSection.set(
-      course.sections[0]!.section_id,
-      classPlannerSourceKey(course),
-    );
-  }
-
-  const batches = chunk(coursesWithSections, ROUTE_BATCH_SIZE);
-  const resolvedBatches = await parallelMap(
-    batches,
-    REQUEST_CONCURRENCY,
-    async (batch) => {
-      const sectionIds = batch.map(({ sections }) => sections[0]!.section_id);
-      const scheduleRef = encodeScheduleRef(term, sectionIds);
-      const response = await fetchJson<ScheduleResponse>(
-        `${CLASS_PLANNER_API}/schedules/${scheduleRef}?context=standalone`,
-        fetcher,
-      );
-
-      const routes: ClassPlannerResolvedRoute[] = [];
-
-      for (const detail of Object.values(response.course_details)) {
-        for (const section of detail.sections) {
-          const sourceKey = sourceKeyByRepresentativeSection.get(
-            section.section_id,
-          );
-
-          if (sourceKey) {
-            routes.push({
-              source_key: sourceKey,
-              module_id: detail.module_id,
-              representative_event_package_id: detail.event_package_id,
-              tss_url: detail.tss_booking_url,
-            });
-          }
-        }
-      }
-
-      return routes;
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        term_code: term, q: "", offset, limit: CATALOG_PAGE_SIZE,
+        sort: "course_code", direction: "asc",
+      }),
     },
   );
-  const routesBySourceKey = new Map(
-    resolvedBatches.flat().map((route) => [route.source_key, route]),
-  );
-
-  if (routesBySourceKey.size !== coursesWithSections.length) {
-    const missing = coursesWithSections
-      .map(classPlannerSourceKey)
-      .filter((sourceKey) => !routesBySourceKey.has(sourceKey));
-    throw new Error(
-      `Class Planner did not resolve ${missing.length} TSS routes: ${missing.slice(0, 5).join(", ")}`,
-    );
+  if (!page || page.term_code !== term || page.offset !== offset ||
+      page.limit !== CATALOG_PAGE_SIZE || !Number.isSafeInteger(page.total) ||
+      page.total < offset || !Array.isArray(page.courses) ||
+      page.courses.length !== Math.min(CATALOG_PAGE_SIZE, page.total - offset)) {
+    throw new Error(`Invalid public Class Planner catalog page for ${term} at offset ${offset}`);
   }
-
-  return Array.from(routesBySourceKey.values());
+  return page;
 }
 
-export function encodeScheduleRef(
-  term: string,
-  sectionIds: readonly string[],
-): string {
-  const payload = JSON.stringify({
-    s: [...sectionIds].sort((left, right) => left.localeCompare(right)),
-    t: normalizeTerm(term),
-  });
-
-  return `CS2${Buffer.from(payload).toString("base64url")}`;
+function normalizePublicCourse(course: PublicCourse): ClassPlannerCourse {
+  return {
+    ...course,
+    availability_refresh_pending: false,
+    metadata_source: null,
+    sections: course.sections.map((section) => ({
+      ...section,
+      meetings: section.meetings.map((meeting) => ({
+        ...meeting,
+        building_code: meeting.building_code ?? null,
+        building_name: meeting.building_name ?? null,
+        room_code: meeting.room_code ?? null,
+        room_name: meeting.room_name ?? null,
+      })),
+    })),
+  };
 }
 
 function normalizeTerm(term: string): string {
@@ -234,11 +178,15 @@ function normalizeTerm(term: string): string {
 async function fetchJson<T>(
   url: string,
   fetcher: ClassPlannerFetch,
+  init: RequestInit = {},
 ): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
   for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt += 1) {
     const response = await fetcher(url, {
-      headers: { Accept: "application/json" },
-      // A sign-in redirect is not catalog data. Do not forward session credentials.
+      ...init,
+      headers,
+      // Stop if the public API starts requiring sign-in.
       redirect: "manual",
       signal: AbortSignal.timeout(30_000),
     });
@@ -250,9 +198,8 @@ async function fetchJson<T>(
     if (response.status === 401 || response.status === 403 ||
         (response.status >= 300 && response.status < 400)) {
       throw new Error(
-        `Class Planner access failed (HTTP ${response.status}). ` +
-        "Set or refresh CLASS_PLANNER_SESSION_COOKIE with an authorized Class Planner session. " +
-        "See README.md for nightly ingestion setup.",
+        `Public Class Planner access failed (HTTP ${response.status}). ` +
+        "The catalog must be accessible without sign-in; check the upstream public API.",
       );
     }
 
@@ -290,16 +237,6 @@ async function parallelMap<T, R>(
     Array.from({ length: Math.min(concurrency, values.length) }, () => worker()),
   );
   return results;
-}
-
-function chunk<T>(values: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < values.length; index += size) {
-    chunks.push(values.slice(index, index + size));
-  }
-
-  return chunks;
 }
 
 function delay(milliseconds: number): Promise<void> {

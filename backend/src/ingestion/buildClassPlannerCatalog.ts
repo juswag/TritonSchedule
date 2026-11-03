@@ -73,14 +73,10 @@ export function buildClassPlannerCatalog(
     const sourceKey = classPlannerSourceKey(course);
     const route = routeBySourceKey.get(sourceKey);
 
-    if (!route) {
-      throw new Error(`Class Planner did not resolve a TSS route for ${sourceKey}`);
-    }
-
-    const packageRoute = parseEventPackageRoute(route.tss_url);
+    const packageRoute = route ? parseEventPackageRoute(route.tss_url) : null;
     const routeKind = packageRoute ? "event_package" : "module";
 
-    if (route.representative_event_package_id && !packageRoute) {
+    if (route?.representative_event_package_id && !packageRoute) {
       throw new Error(`Unsupported TSS event package route for ${sourceKey}`);
     }
 
@@ -90,7 +86,7 @@ export function buildClassPlannerCatalog(
       subject_code: course.subject_code,
       course_code: course.course_code,
       module_code: course.module_code,
-      module_id: route.module_id,
+      module_id: route?.module_id ?? null,
       module_name: course.module_name,
       course_title: course.course_title,
       section_count: course.section_count,
@@ -165,9 +161,9 @@ export function buildClassPlannerCatalog(
       eventPackages.push({
         source_key: sourceKey,
         term_code: term,
-        module_id: route.module_id,
+        module_id: route?.module_id ?? null,
         event_package_id: eventPackageId,
-        tss_booking_url: packageRoute
+        tss_booking_url: packageRoute && route
           ? buildEventPackageUrl(
               route.module_id,
               eventPackageId,
@@ -178,7 +174,7 @@ export function buildClassPlannerCatalog(
       });
     }
 
-    moduleRoutes.push({
+    if (route) moduleRoutes.push({
       source_key: sourceKey,
       term_code: term,
       module_id: route.module_id,
