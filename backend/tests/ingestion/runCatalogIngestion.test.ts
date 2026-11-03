@@ -7,6 +7,9 @@ import {
 import { ProfessorEnrichmentUnavailableError } from "../../src/ingestion/enrichCoursesWithRatings.js";
 import type { ClassPlannerCatalogSnapshot } from "../../src/models/ClassPlannerCatalog.js";
 import type { Course } from "../../src/models/Course.js";
+import { ingestCatalog } from "../../src/ingestion/ingestCatalog.js";
+import { scrapeClassPlanner } from "../../src/ingestion/scrapeClassPlanner.js";
+import { classPlannerCourse } from "./classPlannerFixtures.js";
 
 const catalog: ClassPlannerCatalogSnapshot = {
   event_packages: [],
@@ -65,6 +68,38 @@ function dependencies(
 }
 
 describe("runCatalogIngestion", () => {
+  it("keeps the published catalog when a public catalog page fails", async () => {
+    const publishCatalog = jest.fn<CatalogIngestionDependencies["publishCatalog"]>();
+    const completeRun = jest.fn<CatalogIngestionDependencies["completeRun"]>();
+    const failRun = jest.fn<CatalogIngestionDependencies["failRun"]>();
+
+    await expect(runCatalogIngestion(
+      { professorMode: "never", requestedTerm: "FA26", trigger: "schedule" },
+      dependencies({
+        publishCatalog,
+        completeRun,
+        failRun,
+        ingest: (term) => ingestCatalog(term, {
+          scrapeClassPlanner: (requestedTerm) => scrapeClassPlanner(requestedTerm, {
+            fetch: async (_url, init) => JSON.parse(String(init?.body)).offset === 0
+              ? Response.json({
+                term_code: "FA26", total: 49, offset: 0, limit: 48,
+                courses: Array.from({ length: 48 }, (_, index) => classPlannerCourse(index + 1)),
+              })
+              : new Response(null, { status: 401 }),
+          }),
+        }),
+      }),
+    )).rejects.toThrow("Public Class Planner access failed");
+
+    expect(publishCatalog).not.toHaveBeenCalled();
+    expect(completeRun).not.toHaveBeenCalled();
+    expect(failRun).toHaveBeenCalledWith(expect.objectContaining({
+      catalogPublished: false,
+      error: expect.stringContaining("Public Class Planner access failed"),
+    }));
+  });
+
   it("publishes the catalog before starting professor enrichment", async () => {
     const calls: string[] = [];
     const result = await runCatalogIngestion(

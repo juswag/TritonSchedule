@@ -7,6 +7,21 @@ import {
 import { classMeeting, classPlannerCourse } from "./classPlannerFixtures.js";
 
 describe("buildClassPlannerCatalog", () => {
+  it("preserves the catalog and package memberships without TSS routes", () => {
+    const course = classPlannerCourse(10);
+    const catalog = buildClassPlannerCatalog("FA26", [course], []);
+    expect(catalog.offerings[0]).toMatchObject({ module_code: "CSE-10", module_id: null });
+    expect(catalog.sections).toHaveLength(1);
+    expect(catalog.meetings).toHaveLength(1);
+    expect(catalog.event_packages[0]).toMatchObject({
+      event_package_id: course.sections[0]!.event_package_ids[0], module_id: null, tss_booking_url: null,
+    });
+    expect(catalog.package_sections[0]).toMatchObject({
+      event_package_id: course.sections[0]!.event_package_ids[0], section_id: course.sections[0]!.section_id,
+    });
+    expect(catalog.module_routes).toEqual([]);
+  });
+
   it("normalizes packages, memberships, meetings, and TSS URLs", () => {
     const course = classPlannerCourse(10, {
       sections: [

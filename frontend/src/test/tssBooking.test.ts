@@ -57,6 +57,18 @@ describe("resolveTssBookingUrl", () => {
     }, discussion, lab)).toBe(eventPackageUrl);
   });
 
+  it.each([undefined, {}])(
+    "leaves booking unavailable for a complete public catalog selection without URLs (%j)",
+    (tssPackageUrls) => {
+      expect(resolveTssBookingUrl({
+        ...course,
+        labSections: [lab],
+        tssPackageUrls,
+        tssFallbackUrl: undefined,
+      }, discussion, lab)).toBeUndefined();
+    },
+  );
+
   it("does not resolve a package when the selected lab breaks the intersection", () => {
     expect(resolveTssBookingUrl({
       ...course,

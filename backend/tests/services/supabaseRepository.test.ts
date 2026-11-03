@@ -25,6 +25,98 @@ const classMeeting = {
 };
 
 describe("mapOfferingToCourse", () => {
+  it("preserves public catalog meetings and package membership without booking routes or rooms", () => {
+    const course = classPlannerCourse(100);
+    const publicMeeting = {
+      ...classMeeting,
+      building_code: null,
+      room_code: null,
+      building_name: null,
+      room_name: null,
+    };
+    const lecture = {
+      ...course.sections[0]!,
+      id: 9001,
+      section_id: "E 00000001",
+      section_ref: "FA26:E 00000001",
+      tss_event_packages: [{ event_package_id: "156420", tss_booking_url: null }],
+      class_planner_section_meetings: [
+        publicMeeting,
+        {
+          ...publicMeeting,
+          meeting_ordinal: 1,
+          day_code: "W",
+          day_name: "Wednesday",
+          is_remote: true,
+        },
+        {
+          ...publicMeeting,
+          meeting_ordinal: 2,
+          meeting_kind: "final",
+          specific_date: "2026-12-05",
+        },
+      ],
+    };
+    const [result] = mapOfferingToCourses({
+      ...course,
+      id: 401,
+      source_key: "CSE-100:E 00000001,E 00000002,E 00000003",
+      instructors_search: "Ada Lovelace",
+      section_count: 3,
+      metadata_source: null,
+      tss_module_routes: null,
+      class_planner_sections: [
+        lecture,
+        {
+          ...lecture,
+          id: 9002,
+          section_id: "E 00000002",
+          section_ref: "FA26:E 00000002",
+          section_code: "001-001-DI",
+          instruction_type_name: "discussion",
+          class_planner_section_meetings: [
+            { ...publicMeeting, day_code: "R", day_name: "Thursday" },
+          ],
+        },
+        {
+          ...lecture,
+          id: 9003,
+          section_id: "E 00000003",
+          section_ref: "FA26:E 00000003",
+          section_code: "001-001-LA",
+          instruction_type_name: "lab",
+          class_planner_section_meetings: [
+            { ...publicMeeting, day_code: "F", day_name: "Friday" },
+          ],
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      id: "FA26:E 00000001",
+      Name: "CSE 100: Course 100",
+      Teacher: "Ada Lovelace",
+      Lectures: [
+        {
+          Days: "Tue", Time: "5:00pm-6:20pm", Location: "TBA",
+          SectionRef: "FA26:E 00000001", EventPackageIds: ["156420"],
+        },
+        { Days: "Wed", Time: "5:00pm-6:20pm", Location: "REMOTE" },
+      ],
+      Discussions: [{
+        Days: "Thu", Time: "5:00pm-6:20pm", Location: "TBA",
+        SectionRef: "FA26:E 00000002", EventPackageIds: ["156420"],
+      }],
+      Labs: [{
+        Days: "Fri", Time: "5:00pm-6:20pm", Location: "TBA",
+        SectionRef: "FA26:E 00000003", EventPackageIds: ["156420"],
+      }],
+      Final: { Days: "2026-12-05", Time: "5:00pm-6:20pm", Location: "TBA" },
+    });
+    expect(result?.TssPackageUrls).toEqual({});
+    expect(result?.TssFallbackUrl).toBeUndefined();
+  });
+
   it("keeps exams scoped to their primary section without leaking optional section exams", () => {
     const course = classPlannerCourse();
     const makeSection = (index: number, kind: string, examDates: string[]) => ({
