@@ -45,33 +45,33 @@
   }
 
   .dark {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 216 92% 52%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 214 32% 95%;
-    --secondary-foreground: 222 32% 20%;
-    --muted: 214 32% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 214 60% 96%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 73% 52%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 214 24% 88%;
-    --input: 214 24% 88%;
-    --ring: 216 92% 52%;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 216 92% 52%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 32% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 24% 88%;
-    --sidebar-ring: 216 92% 52%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 213 94% 68%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 0 0% 4%;
+    --border: 0 0% 20%;
+    --input: 0 0% 26%;
+    --ring: 213 94% 68%;
+    --sidebar-background: 0 0% 7%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 213 94% 68%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 213 94% 68%;
   }
 
   * {
@@ -122,4 +122,25 @@
 
 .muted-grid {
   background: hsl(var(--background));
+}
+
+/* Keep each course's saved color while adapting its block to the page theme. */
+.schedule-event {
+  border-color: var(--event-color);
+  color: var(--event-color);
+  background-color: color-mix(in srgb, var(--event-color) 11%, hsl(var(--card)));
+}
+
+.dark .schedule-event {
+  border-color: color-mix(in srgb, var(--event-color) 70%, white);
+  color: color-mix(in srgb, var(--event-color) 45%, white);
+  background-color: color-mix(in srgb, var(--event-color) 18%, hsl(var(--card)));
+}
+
+.course-label {
+  color: var(--course-color);
+}
+
+.dark .course-label {
+  color: color-mix(in srgb, var(--course-color) 45%, white);
 }

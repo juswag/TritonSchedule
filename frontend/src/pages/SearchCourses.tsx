@@ -420,24 +420,24 @@ export default function SearchCourses() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-white">
+    <div className="min-h-[calc(100vh-72px)] bg-card">
       <div className="grid min-h-[calc(100vh-72px)] xl:grid-cols-[minmax(0,1.55fr)_minmax(390px,0.95fr)]">
         <section className="min-w-0 px-4 pb-8 pt-9 sm:px-8 xl:border-r xl:border-border">
           <div className="mx-auto w-full max-w-[880px]">
             <div className="relative mb-6 pr-0 sm:pr-28">
-              <h1 className="text-[42px] font-extrabold leading-none tracking-[-0.05em] text-black sm:text-[52px]">
+              <h1 className="text-[42px] font-extrabold leading-none tracking-[-0.05em] text-foreground sm:text-[52px]">
                 Find your{" "}
-                <span className="inline-block rounded-xl bg-[#eaf2ff] px-2.5 pb-1.5 pt-1">
+                <span className="inline-block rounded-xl bg-[#eaf2ff] dark:bg-accent px-2.5 pb-1.5 pt-1">
                   classes.
                 </span>
               </h1>
-              <p className="mt-4 text-base text-slate-600 sm:text-lg">
+              <p className="mt-4 text-base text-muted-foreground sm:text-lg">
                 Search the catalog and build a conflict-free quarter.
               </p>
               <img
                 src="/illustrations/trident-doodle.png"
                 alt=""
-                className="pointer-events-none absolute right-3 top-[-24px] hidden h-28 w-28 select-none object-contain mix-blend-multiply sm:block"
+                className="pointer-events-none absolute right-3 top-[-24px] hidden h-28 w-28 select-none object-contain mix-blend-multiply dark:invert dark:hue-rotate-180 dark:mix-blend-screen sm:block"
               />
             </div>
 
@@ -451,7 +451,7 @@ export default function SearchCourses() {
                   setSearchQuery(event.target.value);
                   setIsMobileDetailsOpen(false);
                 }}
-                className="h-16 rounded-lg border-border bg-white pl-12 pr-12 text-base shadow-none placeholder:text-muted-foreground/80 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+                className="h-16 rounded-lg border-border bg-card pl-12 pr-12 text-base shadow-none placeholder:text-muted-foreground/80 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
               />
               {searchQuery && (
                 <button
@@ -518,7 +518,7 @@ export default function SearchCourses() {
                         key={course.id}
                         className={cn(
                           "group relative grid min-h-[108px] w-full gap-3 px-5 py-5 text-left md:grid-cols-[1.25fr_1.15fr_1.15fr_.65fr] md:items-center md:gap-5",
-                          isSelected && "bg-primary/[0.055] before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
+                          isSelected && "bg-primary/[0.055] dark:bg-accent before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
                         )}
                       >
                         <button
@@ -550,7 +550,7 @@ export default function SearchCourses() {
                           >
                             {course.rmpRating && (
                               <>
-                                <Star className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600" aria-hidden="true" />
+                                <Star className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600 dark:fill-emerald-400 dark:text-emerald-400" aria-hidden="true" />
                                 <span>{course.rmpRating.toFixed(1)}</span>
                                 <span className="text-muted-foreground" aria-hidden="true">·</span>
                               </>
@@ -594,7 +594,7 @@ export default function SearchCourses() {
 
         <aside
           className={cn(
-            "min-w-0 overflow-hidden bg-[#fefefe] px-5 py-7 sm:px-7 lg:px-8",
+            "min-w-0 overflow-hidden bg-[#fefefe] dark:bg-background px-5 py-7 sm:px-7 lg:px-8",
             isMobileDetailsOpen
               ? "fixed inset-x-0 bottom-0 top-[72px] z-40 xl:sticky xl:top-[72px] xl:z-auto xl:block xl:h-[calc(100vh-72px)] xl:self-start"
               : "hidden xl:sticky xl:top-[72px] xl:block xl:h-[calc(100vh-72px)] xl:self-start"
@@ -634,10 +634,10 @@ export default function SearchCourses() {
                       <h2 className="text-sm font-semibold text-foreground">Rate My Professor</h2>
                       {selectedCourse.rmpRating ? (
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                          <span className="rounded bg-emerald-600 px-2 py-1 font-semibold text-white">
+                          <span className="rounded bg-emerald-600 px-2 py-1 font-semibold text-white dark:bg-emerald-700">
                             {selectedCourse.rmpRating.toFixed(1)}
                           </span>
-                          <span className="font-medium text-emerald-700">
+                          <span className="font-medium text-emerald-700 dark:text-emerald-400">
                             {ratingLabel(selectedCourse.rmpRating)}
                           </span>
                           {selectedCourse.rmpTakeAgain !== undefined && (
@@ -690,7 +690,7 @@ export default function SearchCourses() {
                     <span
                       className={cn(
                         "text-xs font-medium",
-                        conflictingScheduledEvents.length > 0 ? "text-rose-700" : "text-emerald-700"
+                        conflictingScheduledEvents.length > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-400"
                       )}
                     >
                       {conflictingScheduledEvents.length > 0
@@ -700,7 +700,7 @@ export default function SearchCourses() {
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Current schedule + this selection</p>
                   {conflictingScheduledEvents.length > 0 && (
-                    <div className="mt-3 flex gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs leading-5 text-rose-800">
+                    <div className="mt-3 flex gap-2 rounded-md border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40 px-3 py-2.5 text-xs leading-5 text-rose-800 dark:text-rose-200">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <p>{formatConflictMessage(conflictingScheduledEvents)}</p>
                     </div>
@@ -713,14 +713,14 @@ export default function SearchCourses() {
                 </section>
               </div>
 
-              <div className="-mx-5 shrink-0 border-t border-border bg-[#fefefe] px-5 pb-6 pt-4 sm:-mx-7 sm:px-7 lg:-mx-8 lg:px-8 xl:mx-0 xl:px-0 xl:pb-0">
+              <div className="-mx-5 shrink-0 border-t border-border bg-[#fefefe] dark:bg-background px-5 pb-6 pt-4 sm:-mx-7 sm:px-7 lg:-mx-8 lg:px-8 xl:mx-0 xl:px-0 xl:pb-0">
                 <div className="grid gap-2 sm:grid-cols-2">
                   {selectedTssUrl ? (
                     <a
                       href={selectedTssUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-border bg-white px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
                     >
                       <ExternalLink className="h-4 w-4" />
                       Open in TSS
@@ -833,7 +833,7 @@ function SectionPicker({
               role="combobox"
               aria-expanded={isOpen}
               aria-label={`Choose ${label.toLowerCase()} section`}
-              className="mt-2 flex min-h-16 w-full items-center gap-3 rounded-md border border-border bg-white px-3.5 py-2.5 text-left outline-none transition-colors hover:border-slate-300 hover:bg-slate-50/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+              className="mt-2 flex min-h-16 w-full items-center gap-3 rounded-md border border-border bg-card px-3.5 py-2.5 text-left outline-none transition-colors hover:border-input hover:bg-muted/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-foreground">{selectedSection.name}</span>
@@ -854,7 +854,7 @@ function SectionPicker({
           <PopoverContent
             align="start"
             sideOffset={6}
-            className="w-[var(--radix-popover-trigger-width)] rounded-md border-border bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.12)]"
+            className="w-[var(--radix-popover-trigger-width)] rounded-md border-border bg-card p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.12)]"
           >
             <div role="listbox" aria-label={`${label} sections`} className="max-h-72 space-y-1 overflow-y-auto">
               {sections.map((section) => {
@@ -871,7 +871,7 @@ function SectionPicker({
                     }}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted",
-                      isSelected && "bg-primary/[0.055]"
+                      isSelected && "bg-primary/[0.055] dark:bg-accent"
                     )}
                   >
                     <span className="min-w-0 flex-1">
@@ -897,12 +897,12 @@ function SectionPicker({
           </PopoverContent>
         </Popover>
       ) : totalCount > 0 ? (
-        <div className="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+        <div className="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 px-3 py-3 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>No conflict-free {label.toLowerCase()} sections are available.</span>
         </div>
       ) : (
-        <p className="mt-2 rounded-md border border-border bg-white px-3 py-3 text-sm text-muted-foreground">
+        <p className="mt-2 rounded-md border border-border bg-card px-3 py-3 text-sm text-muted-foreground">
           No {label.toLowerCase()} required
         </p>
       )}
@@ -945,7 +945,7 @@ function CourseSchedulePreview({
   ];
 
   return (
-    <div className="mt-4 overflow-hidden rounded-md border border-border bg-white">
+    <div className="mt-4 overflow-hidden rounded-md border border-border bg-card">
       <div className="grid grid-cols-[38px_repeat(5,minmax(0,1fr))] border-b border-border bg-muted/35">
         <div />
         {PREVIEW_DAYS.map((day) => (
@@ -1029,12 +1029,12 @@ function PreviewBlock({
     <div
       className={cn(
         "absolute z-10 overflow-hidden rounded-[4px] border px-1 py-1 text-[9px] font-semibold leading-tight",
-        conflicting && tone === "existing" && "left-1 right-[51%] border-rose-300 bg-rose-50 text-rose-700",
-        conflicting && tone !== "existing" && "left-[51%] right-1 border-rose-500 bg-rose-100 text-rose-800",
+        conflicting && tone === "existing" && "left-1 right-[51%] border-rose-300 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300",
+        conflicting && tone !== "existing" && "left-[51%] right-1 border-rose-500 bg-rose-100 dark:border-rose-400 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200",
         !conflicting && "inset-x-1",
         !conflicting && tone === "lecture" && "border-primary bg-primary text-primary-foreground",
-        !conflicting && tone === "section" && "border-sky-300 bg-sky-50 text-sky-700",
-        !conflicting && tone === "existing" && "border-slate-300 bg-slate-100 text-slate-600"
+        !conflicting && tone === "section" && "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-950 dark:text-sky-200",
+        !conflicting && tone === "existing" && "border-border bg-muted text-muted-foreground"
       )}
       style={{ top: `${Math.max(top, 0)}%`, height: `${Math.min(height, 100 - Math.max(top, 0))}%` }}
       title={`${label}, ${formatClockTime(startTime)}-${formatClockTime(endTime)}${conflicting ? ", conflict" : ""}`}

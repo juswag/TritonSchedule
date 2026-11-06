@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, MapPin, Plus, Trash2 } from "lucide-react";
 import { useCalendar } from "@/context/CalendarContext";
@@ -79,7 +79,7 @@ export default function CalendarPage() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-[#fcfdff] px-4 py-6 sm:px-7">
+    <div className="min-h-[calc(100vh-72px)] bg-[#fcfdff] dark:bg-background px-4 py-6 sm:px-7">
       <div className="mx-auto w-full max-w-[1440px]">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -110,7 +110,7 @@ export default function CalendarPage() {
             <TabsTrigger value="exams" className="gap-2 rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
               Exams
               {examSchedule.conflicts.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">
                   <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
                   {examSchedule.conflicts.length} {examSchedule.conflicts.length === 1 ? "conflict" : "conflicts"}
                 </span>
@@ -118,7 +118,7 @@ export default function CalendarPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="weekly" className="mt-0">
-        <div className="overflow-hidden rounded-lg border border-border bg-white">
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="sm:hidden">
             <div className="grid grid-cols-5 border-b border-border">
               {WEEK_DAYS.map((day) => (
@@ -188,11 +188,11 @@ export default function CalendarPage() {
                 className="grid min-w-[760px] grid-cols-[64px_repeat(5,minmax(130px,1fr))]"
                 style={{ height: `${GRID_TOP_GUTTER + HOURS.length * HOUR_HEIGHT}px` }}
               >
-                <div className="relative border-r border-border bg-white">
+                <div className="relative border-r border-border bg-card">
                   {HOURS.map((hour, index) => (
                     <span
                       key={hour}
-                      className="absolute right-2 -translate-y-1/2 bg-white px-1 text-[10px] font-medium leading-none text-muted-foreground"
+                      className="absolute right-2 -translate-y-1/2 bg-card px-1 text-[10px] font-medium leading-none text-muted-foreground"
                       style={{ top: `${GRID_TOP_GUTTER + index * HOUR_HEIGHT}px` }}
                     >
                       {formatHour(hour)}
@@ -227,15 +227,11 @@ export default function CalendarPage() {
                           >
                             <div
                               className={cn(
-                                "group relative flex h-full flex-col overflow-hidden rounded-[5px] border px-2",
+                                "schedule-event group relative flex h-full flex-col overflow-hidden rounded-[5px] border px-2",
                                 style.height >= 72 ? "gap-1 py-2" : style.height >= 52 ? "gap-0.5 py-0.5" : "py-0.5"
                               )}
                               title={`${event.title}\n${formatTo12Hour(event.startTime)} - ${formatTo12Hour(event.endTime)}${event.isCourse || event.location ? `\n${event.location || "Location unavailable"}` : ""}`}
-                              style={{
-                                borderColor: event.color,
-                                color: event.color,
-                                backgroundColor: `color-mix(in srgb, ${event.color} 11%, white)`,
-                              }}
+                              style={{ "--event-color": event.color } as CSSProperties}
                             >
                               <div className="flex min-w-0 shrink-0 items-baseline justify-between gap-2">
                                 <p className={cn(
@@ -264,7 +260,7 @@ export default function CalendarPage() {
                               <button
                                 type="button"
                                 onClick={() => removeEvent(event)}
-                                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-white/95 text-muted-foreground opacity-0 shadow-sm transition hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+                                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-card/95 text-muted-foreground opacity-0 shadow-sm transition hover:text-destructive focus:opacity-100 group-hover:opacity-100"
                                 aria-label={`Remove ${event.title}`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
