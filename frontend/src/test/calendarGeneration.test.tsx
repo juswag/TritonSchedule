@@ -581,6 +581,14 @@ describe("schedule page generation", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Preview Finals plan" }),
     );
+    const meeting = screen.getAllByRole("button", { name: /^View CSE 101/ })[0];
+    fireEvent.click(meeting);
+    const details = within(screen.getByRole("dialog", { name: /CSE 101/ }));
+    expect(details.getByText("Final · Wed, Dec 9, 2026")).toBeVisible();
+    expect(details.getByText("8:00 AM – 10:00 AM · CENTR 115")).toBeVisible();
+    fireEvent.click(
+      details.getByRole("button", { name: "Close meeting details" }),
+    );
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Exams" }), {
       button: 0,
     });

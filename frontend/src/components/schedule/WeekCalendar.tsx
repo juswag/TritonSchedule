@@ -10,6 +10,7 @@ import { MapPin, Trash2, X } from "lucide-react";
 import type { CalendarEvent, Weekday } from "@/types/calendar";
 import { cn } from "@/lib/utils";
 import { getCourseCode } from "@/lib/courseLabels";
+import { getExamSchedule } from "@/lib/examSchedule";
 import {
   Popover,
   PopoverTrigger,
@@ -492,8 +493,49 @@ function MeetingDetails({
           </PopoverClose>
         </div>
         <MeetingFacts event={event} events={events} />
+        {event.isCourse && <CourseExams event={event} events={events} />}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function CourseExams({
+  event,
+  events,
+}: {
+  event: CalendarEvent;
+  events: CalendarEvent[];
+}) {
+  const courseId = event.courseId || event.id;
+  const { exams, missingCourses } = getExamSchedule(
+    events.filter((meeting) => (meeting.courseId || meeting.id) === courseId),
+  );
+
+  return (
+    <section className="space-y-2 border-t border-border px-4 py-3">
+      <h4 className="text-sm font-semibold">Exams</h4>
+      {exams.length ? (
+        <ul className="space-y-2.5 text-sm">
+          {exams.map((exam) => (
+            <li key={exam.id}>
+              <p className="font-medium">
+                {exam.name || (exam.type === "final" ? "Final" : "Midterm")} ·{" "}
+                {exam.dateLabel}
+              </p>
+              <p className="text-muted-foreground">
+                {exam.timeLabel} · {exam.location}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {missingCourses.length
+            ? "Exam details weren’t saved. Generate a new schedule or re-add this course to load them."
+            : "No exams listed for this course."}
+        </p>
+      )}
+    </section>
   );
 }
 
