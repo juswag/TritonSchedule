@@ -746,6 +746,34 @@ export default function CalendarPage() {
   ]).size;
 
   const conflictCount = examSchedule.conflicts.length;
+  const waitingForFirstResult = previewing && busy && !shown;
+  const generationProgress = previewing && busy && (
+    <div
+      className={
+        waitingForFirstResult
+          ? "schedule-generation-placeholder flex flex-col items-center justify-center gap-1 px-4 py-6 text-center"
+          : "flex flex-wrap items-center gap-x-4 px-3 py-1 sm:px-5"
+      }
+    >
+      <div
+        role="status"
+        className={`flex items-center text-sm font-medium ${waitingForFirstResult ? "flex-col gap-4" : "gap-2"}`}
+      >
+        <span
+          aria-hidden="true"
+          className={`schedule-generation-ring text-primary motion-safe:animate-spin ${waitingForFirstResult ? "size-10 border-[3px]" : "size-4 border-2"}`}
+        />
+        {phase === "loading" ? "Loading course options…" : "Finding schedules…"}
+      </div>
+      <button
+        type="button"
+        onClick={stop}
+        className="plan-button quiet text-muted-foreground"
+      >
+        Cancel generation
+      </button>
+    </div>
+  );
   const viewSwitcher = (
     <TabsList aria-label="Schedule views" className="schedule-view-switch">
       <TabsTrigger value="weekly">
@@ -910,14 +938,7 @@ export default function CalendarPage() {
                 disabled={!visibleCourses.length || !term || applying || busy}
                 className={`mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 ${previewing ? "border border-border bg-card text-primary hover:bg-primary/5" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
               >
-                {busy ? (
-                  <span
-                    aria-hidden="true"
-                    className="schedule-generation-ring size-4 border-2 motion-safe:animate-spin"
-                  />
-                ) : (
-                  <CalendarPlus className="h-4 w-4" />
-                )}
+                <CalendarPlus aria-hidden="true" className="h-4 w-4" />
                 {busy
                   ? "Finding schedules…"
                   : schedules.length
@@ -988,7 +1009,11 @@ export default function CalendarPage() {
           className="plan-calendar min-w-0 scroll-mt-24 overflow-hidden focus:outline-none"
           aria-label="Calendar"
         >
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className={waitingForFirstResult ? "schedule-awaiting-results" : undefined}
+          >
             <header>
               {!previewing && (
                 <SavedPlanToolbar
@@ -1027,7 +1052,21 @@ export default function CalendarPage() {
                 )}
                 {previewing && (
                   <>
-                    {!shown && <div className="mb-3">{viewSwitcher}</div>}
+                    {!shown && (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        {viewSwitcher}
+                        <button
+                          type="button"
+                          onClick={backToSaved}
+                          disabled={applying}
+                          aria-label="Back to saved schedule"
+                          className="plan-button quiet"
+                        >
+                          <ChevronLeft aria-hidden="true" size={16} />
+                          Back
+                        </button>
+                      </div>
+                    )}
                     {dirty && (
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
                         <p role="status" className="text-sm">
@@ -1040,26 +1079,6 @@ export default function CalendarPage() {
                           className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
                         >
                           Update schedules
-                        </button>
-                      </div>
-                    )}
-                    {busy && (
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 py-2">
-                        <div role="status" className="flex items-center gap-3 text-sm font-medium">
-                          <span
-                            aria-hidden="true"
-                            className="schedule-generation-ring size-8 border-[3px] text-primary motion-safe:animate-spin"
-                          />
-                          {phase === "loading"
-                            ? "Loading course options…"
-                            : "Finding schedules…"}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={stop}
-                          className="min-h-11 rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
-                        >
-                          Cancel generation
                         </button>
                       </div>
                     )}
@@ -1275,40 +1294,37 @@ export default function CalendarPage() {
                         Start again
                       </button>
                     )}
-                    {!shown && (
-                      <button
-                        disabled={applying}
-                        onClick={backToSaved}
-                        className="min-h-9 text-sm font-medium text-primary hover:underline sm:ml-auto"
-                      >
-                        Back to saved schedule
-                      </button>
-                    )}
                   </>
                 )}
               </div>
             </header>
             <TabsContent value="weekly" className="mt-0">
-              <WeekCalendar
-                className="rounded-none border-0"
-                events={calendarEvents}
-                rangeEvents={savedPreview ? displayedEvents : rangeEvents}
-                focusHours={true}
-                highlightedCourse={highlightedCourse}
-                changedIds={changedIds}
-                onRemove={
-                  previewing || savedPreview ? undefined : removeSavedEvent
-                }
-              />
+              {generationProgress}
+              {!waitingForFirstResult && (
+                <WeekCalendar
+                  className="rounded-none border-0"
+                  events={calendarEvents}
+                  rangeEvents={savedPreview ? displayedEvents : rangeEvents}
+                  focusHours={true}
+                  highlightedCourse={highlightedCourse}
+                  changedIds={changedIds}
+                  onRemove={
+                    previewing || savedPreview ? undefined : removeSavedEvent
+                  }
+                />
+              )}
             </TabsContent>
             <TabsContent value="exams" className="mt-0">
-              <ExamSchedule
-                {...examSchedule}
-                courseCount={courseCount}
-                hasDraftCourses={visibleCourses.length > 0}
-                examOnlyCourses={termExamCourses}
-                onRemoveCourse={deleteEventsByCourseId}
-              />
+              {generationProgress}
+              {!waitingForFirstResult && (
+                <ExamSchedule
+                  {...examSchedule}
+                  courseCount={courseCount}
+                  hasDraftCourses={visibleCourses.length > 0}
+                  examOnlyCourses={termExamCourses}
+                  onRemoveCourse={deleteEventsByCourseId}
+                />
+              )}
             </TabsContent>
           </Tabs>
         </section>

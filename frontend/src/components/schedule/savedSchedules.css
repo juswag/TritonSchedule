@@ -7,6 +7,10 @@
   border-top-color: currentColor;
 }
 
+.schedule-generation-placeholder {
+  min-height: clamp(14rem, 50svh, 28rem);
+}
+
 .plan-shelf {
   margin-top: 24px;
   padding-top: 16px;
@@ -187,6 +191,18 @@
   }
 }
 @media (min-width: 1024px) {
+  .schedule-awaiting-results {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .schedule-awaiting-results > [role="tabpanel"][data-state="active"] {
+    display: grid;
+    flex: 1;
+  }
+  .schedule-generation-placeholder {
+    min-height: 12rem;
+  }
   .plan-workspace {
     height: calc(100dvh - 112px);
     min-height: 320px;
