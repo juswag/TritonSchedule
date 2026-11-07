@@ -191,17 +191,8 @@
   }
 }
 @media (min-width: 1024px) {
-  .schedule-awaiting-results {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-  .schedule-awaiting-results > [role="tabpanel"][data-state="active"] {
-    display: grid;
-    flex: 1;
-  }
   .schedule-generation-placeholder {
-    min-height: 12rem;
+    min-height: 100%;
   }
   .plan-workspace {
     height: calc(100dvh - 112px);

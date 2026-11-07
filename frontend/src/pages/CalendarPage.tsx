@@ -1009,10 +1009,11 @@ export default function CalendarPage() {
           className="plan-calendar min-w-0 scroll-mt-24 overflow-hidden focus:outline-none"
           aria-label="Calendar"
         >
+          {waitingForFirstResult && generationProgress}
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className={waitingForFirstResult ? "schedule-awaiting-results" : undefined}
+            hidden={waitingForFirstResult}
           >
             <header>
               {!previewing && (
@@ -1298,8 +1299,8 @@ export default function CalendarPage() {
                 )}
               </div>
             </header>
+            {shown && generationProgress}
             <TabsContent value="weekly" className="mt-0">
-              {generationProgress}
               {!waitingForFirstResult && (
                 <WeekCalendar
                   className="rounded-none border-0"
@@ -1315,7 +1316,6 @@ export default function CalendarPage() {
               )}
             </TabsContent>
             <TabsContent value="exams" className="mt-0">
-              {generationProgress}
               {!waitingForFirstResult && (
                 <ExamSchedule
                   {...examSchedule}
