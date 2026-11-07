@@ -1,4 +1,4 @@
-import { Fragment, useId } from "react";
+import { type CSSProperties, Fragment, useId } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import type { CalendarCourse } from "@/types/calendar";
 import type { ExamConflict, ScheduledExam } from "@/lib/examSchedule";
@@ -18,7 +18,7 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
 
   if (courseCount === 0) {
     return (
-      <div className="rounded-lg border border-border bg-white px-5 py-14 text-center">
+      <div className="rounded-lg border border-border bg-card px-5 py-14 text-center">
         <p className="text-sm font-semibold text-foreground">Add courses to see their exam details</p>
         <p className="mt-1 text-sm text-muted-foreground">Your selected courses’ midterms and finals will appear here.</p>
       </div>
@@ -28,11 +28,11 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
   return (
     <div className="space-y-8">
       {examOnlyCourses.length > 0 && (
-        <ul aria-label="Courses without weekly meetings" className="divide-y divide-border rounded-lg border border-border bg-white">
+        <ul aria-label="Courses without weekly meetings" className="divide-y divide-border rounded-lg border border-border bg-card">
           {examOnlyCourses.map((course) => (
             <li key={course.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
               <div className="min-w-0">
-                <p className="font-medium" style={{ color: course.color }}>{course.title}</p>
+                <p className="course-label font-medium" style={{ "--course-color": course.color } as CSSProperties}>{course.title}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">No weekly meetings</p>
               </div>
               <button type="button" onClick={() => onRemoveCourse?.(course.id)} aria-label={`Remove ${course.title}`} className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
@@ -43,7 +43,7 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
         </ul>
       )}
       {missingCourses.length > 0 && (
-        <p className="rounded-lg border border-border bg-white px-4 py-3 text-sm text-muted-foreground">
+        <p className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
           Exam details weren’t saved for {missingCourses.map((course) => course.title).join(", ")}.
           {" "}Remove and re-add these courses to load their exams.
         </p>
@@ -54,7 +54,7 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
         return (
           <section key={type} aria-labelledby={`${id}-${type}`}>
             <h2 id={`${id}-${type}`} className="mb-3 text-xl font-semibold tracking-tight text-foreground">{title}</h2>
-            <div className="overflow-hidden rounded-lg border border-border bg-white">
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
               {sectionExams.length === 0 ? (
                 <p className="px-5 py-8 text-sm text-muted-foreground">No {type} details available.</p>
               ) : (
@@ -88,14 +88,14 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
                           <tr role="row" className="block border-t border-border px-4 py-3 first:border-t-0 md:table-row md:p-0 md:first:border-t">
                             <td role="cell" className="block py-1 font-medium text-foreground md:table-cell lg:whitespace-nowrap md:px-5 md:py-4">{exam.dateLabel}</td>
                             <td role="cell" className="block py-1 md:table-cell md:px-5 md:py-4">
-                              <span className="flex items-start gap-2.5 font-medium" style={{ color: exam.color }}>
+                              <span className="course-label flex items-start gap-2.5 font-medium" style={{ "--course-color": exam.color } as CSSProperties}>
                                 <span aria-hidden="true" className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: exam.color }} />
                                 <span>{exam.courseTitle}</span>
                               </span>
                             </td>
                             <td role="cell" aria-describedby={related.length ? related.map(conflictId).join(" ") : undefined} className="block py-1 text-foreground md:table-cell lg:whitespace-nowrap md:px-5 md:py-4">
                               <span className="flex items-center gap-2">
-                                {related.length > 0 && <AlertTriangle aria-label="Exam time conflict" className="h-4 w-4 shrink-0 text-amber-700" />}
+                                {related.length > 0 && <AlertTriangle aria-label="Exam time conflict" className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />}
                                 {exam.timeLabel}
                               </span>
                             </td>
@@ -104,9 +104,9 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
                             </td>
                           </tr>
                           {notices.map((conflict) => (
-                            <tr role="row" key={conflict.id} className="block border-t border-amber-200/70 bg-amber-50 md:table-row">
+                            <tr role="row" key={conflict.id} className="block border-t border-amber-200/70 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 md:table-row">
                               <td role="cell" colSpan={4} className="block px-4 py-3 md:table-cell md:px-5">
-                                <p id={conflictId(conflict)} className="flex items-center gap-2.5 font-semibold text-amber-800">
+                                <p id={conflictId(conflict)} className="flex items-center gap-2.5 font-semibold text-amber-800 dark:text-amber-200">
                                   <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
                                   <span>{conflict.first.courseCode} and {conflict.second.courseCode} overlap</span>
                                 </p>
