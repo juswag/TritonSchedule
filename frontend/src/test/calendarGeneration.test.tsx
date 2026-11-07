@@ -711,12 +711,9 @@ describe("schedule page generation", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Remove MATH 109" }));
     expect(worker.terminate).toHaveBeenCalled();
-    expect(
-      screen.getByText(
-        "Courses or calendar events changed. Generate again to update this preview.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Use schedule" })).toBeDisabled();
+    expect(screen.getByText("Preview out of date")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update preview" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Use schedule" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Find more schedules" }),
     ).not.toBeInTheDocument();
@@ -732,6 +729,23 @@ describe("schedule page generation", () => {
     expect(JSON.parse(localStorage.getItem(selectionsKey)!)).toEqual([
       { key: cse.key, term: TERM, code: cse.code, title: cse.title },
     ]);
+    fireEvent.click(screen.getByRole("button", { name: "Update preview" }));
+    await waitFor(() => expect(GeneratorWorker.instances).toHaveLength(2));
+    act(() => { GeneratorWorker.instances[1].flush(); });
+    expect(screen.queryByText("Preview out of date")).toBeNull();
+    expect(screen.getByRole("button", { name: "Use schedule" })).toBeEnabled();
+  });
+
+  it("opens course search from the outdated preview when the last course is removed", async () => {
+    mountPage({ courses: [cse] });
+    const worker = await generate();
+    act(() => { worker.flush(); });
+    fireEvent.click(screen.getByRole("button", { name: "Remove CSE 101" }));
+    fireEvent.click(screen.getByRole("button", { name: "Find a course" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Quick course search" })).toHaveFocus());
+    expect(screen.queryByRole("button", { name: "Update preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save Schedule" })).toBeDisabled();
+    expect(GeneratorWorker.instances).toHaveLength(1);
   });
 
   it("cancels an options request and ignores its late response", async () => {
@@ -815,7 +829,8 @@ describe("schedule page generation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add personal event" }));
     expect(signal.aborted).toBe(true);
     await act(async () => refresh.resolve([cse, math]));
-    expect(screen.getByRole("button", { name: "Use schedule" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Use schedule" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Update preview" })).toBeEnabled();
     expect(storedEvents().map((event) => event.id)).toEqual([
       personal.id,
       oldCourse.id,

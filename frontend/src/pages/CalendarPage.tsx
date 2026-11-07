@@ -32,6 +32,8 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  RefreshCw,
+  Search,
   Undo2,
   ArrowDownWideNarrow,
   X,
@@ -770,6 +772,26 @@ export default function CalendarPage() {
       </button>
     </div>
   );
+  const outdatedPreview = dirty && (
+    <p role="status" className="text-xs leading-4 text-muted-foreground">
+      Preview out of date
+    </p>
+  );
+  const updatePreviewAction = dirty && (
+    <button
+      type="button"
+      className="plan-button"
+      disabled={applying || busy}
+      onClick={selected.length ? generate : editCourses}
+    >
+      {selected.length ? (
+        <RefreshCw aria-hidden="true" size={16} />
+      ) : (
+        <Search aria-hidden="true" size={16} />
+      )}
+      {selected.length ? "Update preview" : "Find a course"}
+    </button>
+  );
   const viewSwitcher = (
     <TabsList aria-label="Schedule views" className="schedule-view-switch">
       <TabsTrigger value="weekly">
@@ -1064,26 +1086,15 @@ export default function CalendarPage() {
                         </button>
                       </div>
                     )}
-                    {dirty && (
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
-                        <p role="status" className="text-sm">
-                          Courses or calendar events changed. Generate again to
-                          update this preview.
-                        </p>
-                        <button
-                          onClick={generate}
-                          disabled={!selected.length || busy || applying}
-                          className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                        >
-                          Update schedules
-                        </button>
-                      </div>
-                    )}
                     {!shown && !busy && (
                       <div className="mb-3" aria-live="polite">
                         <div className="flex flex-wrap items-center gap-x-3">
-                          <h2 className="text-base font-semibold">{resultCount}</h2>
+                          <div>
+                            <h2 className="text-base font-semibold">{resultCount}</h2>
+                            {outdatedPreview}
+                          </div>
                           <SkippedOptions courses={sourceCourses} />
+                          {updatePreviewAction}
                         </div>
                         {searchStatus && (
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -1123,15 +1134,18 @@ export default function CalendarPage() {
                             >
                               <X aria-hidden="true" className="h-4 w-4" />
                             </button>
-                            <h2
-                              aria-live="polite"
-                              className="whitespace-nowrap text-base font-semibold tabular-nums"
-                            >
-                              Schedule {index + 1}{" "}
-                              <span className="font-normal text-muted-foreground">
-                                of {sorted.length}
-                              </span>
-                            </h2>
+                            <div>
+                              <h2
+                                aria-live="polite"
+                                className="whitespace-nowrap text-base font-semibold tabular-nums"
+                              >
+                                Schedule {index + 1}{" "}
+                                <span className="font-normal text-muted-foreground">
+                                  of {sorted.length}
+                                </span>
+                              </h2>
+                              {outdatedPreview}
+                            </div>
                             <div
                               role="group"
                               aria-label="Choose a schedule"
@@ -1223,24 +1237,26 @@ export default function CalendarPage() {
                               onClick={openSave}
                               disabled={!canSavePlan}
                             />
-                            <button
-                              type="button"
-                              disabled={
-                                dirty || busy || applying || phase === "error"
-                              }
-                              onClick={keepSchedule}
-                              className="inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 sm:flex-none"
-                            >
-                              {applying ? (
-                                <Loader2
-                                  aria-hidden="true"
-                                  className="h-4 w-4 motion-safe:animate-spin"
-                                />
-                              ) : (
-                                <Check aria-hidden="true" className="h-4 w-4" />
-                              )}
-                              {applying ? "Applying…" : "Use schedule"}
-                            </button>
+                            {dirty ? updatePreviewAction : (
+                              <button
+                                type="button"
+                                disabled={
+                                  busy || applying || phase === "error"
+                                }
+                                onClick={keepSchedule}
+                                className="inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 sm:flex-none"
+                              >
+                                {applying ? (
+                                  <Loader2
+                                    aria-hidden="true"
+                                    className="h-4 w-4 motion-safe:animate-spin"
+                                  />
+                                ) : (
+                                  <Check aria-hidden="true" className="h-4 w-4" />
+                                )}
+                                {applying ? "Applying…" : "Use schedule"}
+                              </button>
+                            )}
                           </div>
                         </div>
                         {searchStatus && (
@@ -1253,7 +1269,7 @@ export default function CalendarPage() {
                         )}
                       </div>
                     )}
-                    {!shown && phase === "complete" && (
+                    {!shown && phase === "complete" && !dirty && (
                       <div className="mb-4 rounded-md border border-border bg-card p-8 text-center">
                         <h2 className="text-base font-semibold">
                           No schedules fit these courses
