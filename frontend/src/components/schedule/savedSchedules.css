@@ -354,6 +354,13 @@
 }
 
 @container (max-width: 35rem) {
+  .schedule-controls .section-notes-trigger {
+    width: 44px;
+    padding-inline: 0;
+  }
+  .schedule-controls .section-notes-trigger span {
+    @apply sr-only;
+  }
   .schedule-controls {
     gap: 8px;
   }

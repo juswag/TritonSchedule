@@ -887,12 +887,12 @@ describe("schedule page generation", () => {
     expect(
       screen.getByText("No schedules fit these courses"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Some course options need review"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("CSE 101: Section A00 has no verified meeting time."),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Skipped options" }));
+    const notes = within(screen.getByRole("dialog", { name: "Skipped section options" }));
+    expect(notes.getByText("CSE 101")).toBeVisible();
+    expect(notes.getByText("Section A00 has no verified meeting time.")).toBeVisible();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Skipped options" })).toHaveFocus());
     expect(
       screen.queryByRole("button", { name: "Use schedule" }),
     ).not.toBeInTheDocument();

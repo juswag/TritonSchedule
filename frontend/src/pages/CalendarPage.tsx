@@ -3,6 +3,7 @@ import { getExamSchedule } from "@/lib/examSchedule";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SavedScheduleShelf } from "@/components/schedule/SavedScheduleShelf";
+import { SkippedOptions } from "@/components/schedule/SkippedOptions";
 import {
   SavedPlanToolbar,
   SavePlanButton,
@@ -174,7 +175,6 @@ export default function CalendarPage() {
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [issues, setIssues] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
   const [sourceSignature, setSourceSignature] = useState("");
   const [sourceCourses, setSourceCourses] = useState<ScheduleCourse[]>([]);
@@ -554,7 +554,6 @@ export default function CalendarPage() {
     setActiveScheduleId(null);
     setSourceSignature("");
     setSourceCourses([]);
-    setIssues([]);
     setPhase("idle");
     setPreviewing(false);
     setNotice("Schedule cleared.");
@@ -583,7 +582,7 @@ export default function CalendarPage() {
     setNotice("");
     setSchedules([]);
     setActiveScheduleId(null);
-    setIssues([]);
+    setSourceCourses([]);
     setPreviewing(true);
     setCoursesExpanded(false);
     setHighlightedCourse(null);
@@ -623,9 +622,6 @@ export default function CalendarPage() {
       setSourceSignature(capturedSignature);
       setSelected(courses);
       setSourceCourses(courses);
-      setIssues(
-        courses.flatMap((c) => c.issues.map((issue) => `${c.code}: ${issue}`)),
-      );
       const nextWorker = new Worker(
         new URL("../workers/scheduleGenerator.worker.ts", import.meta.url),
         { type: "module" },
@@ -1085,9 +1081,10 @@ export default function CalendarPage() {
                     )}
                     {!shown && !busy && (
                       <div className="mb-3" aria-live="polite">
-                        <h2 className="text-base font-semibold">
-                          {resultCount}
-                        </h2>
+                        <div className="flex flex-wrap items-center gap-x-3">
+                          <h2 className="text-base font-semibold">{resultCount}</h2>
+                          <SkippedOptions courses={sourceCourses} />
+                        </div>
                         {searchStatus && (
                           <p className="mt-1 text-xs text-muted-foreground">
                             {searchStatus}
@@ -1105,18 +1102,6 @@ export default function CalendarPage() {
                       >
                         Find more schedules
                       </button>
-                    )}
-                    {!!issues.length && (
-                      <details className="mb-4 text-sm">
-                        <summary className="cursor-pointer text-amber-800">
-                          Some course options need review
-                        </summary>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                          {issues.map((issue, i) => (
-                            <li key={i}>{issue}</li>
-                          ))}
-                        </ul>
-                      </details>
                     )}
                     {shown && (
                       <div
@@ -1185,6 +1170,7 @@ export default function CalendarPage() {
                                 />
                               </button>
                             </div>
+                            <SkippedOptions courses={sourceCourses} />
                           </div>
                           {viewSwitcher}
                           <div className="schedule-result-actions flex flex-wrap items-center gap-2">
@@ -1273,8 +1259,8 @@ export default function CalendarPage() {
                           No schedules fit these courses
                         </h2>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          {issues.length
-                            ? "Some required options could not be verified. Review the course data above or choose other courses."
+                          {sourceCourses.some((course) => course.issues.length)
+                            ? "Check the skipped options or try a different course combination."
                             : "Their meeting times conflict with each other or with your personal events. Try changing the course list."}
                         </p>
                         <button
