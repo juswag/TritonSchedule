@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -14,6 +14,7 @@ type ExamScheduleProps = {
   exams: ScheduledExam[];
   conflicts: ExamConflict[];
   missingCourses: { id: string; title: string }[];
+  coursesWithoutMidterms: string[];
   courseCount: number;
   hasDraftCourses: boolean;
   examOnlyCourses?: CalendarCourse[];
@@ -43,10 +44,12 @@ function ExamDates({
   title,
   exams,
   conflictIds,
+  children,
 }: {
   title: string;
   exams: ScheduledExam[];
   conflictIds: Map<string, string[]>;
+  children?: ReactNode;
 }) {
   const dates = new Map<string, ScheduledExam[]>();
   for (const exam of exams) {
@@ -61,108 +64,113 @@ function ExamDates({
         <h2 id={headingId} className="text-base font-semibold">
           {title}
         </h2>
-        <span
-          aria-label={`${exams.length} exams`}
-          className="text-xs tabular-nums text-muted-foreground"
-        >
-          {exams.length}
-        </span>
+        {exams.length > 0 && (
+          <span
+            aria-label={`${exams.length} exams`}
+            className="text-xs tabular-nums text-muted-foreground"
+          >
+            {exams.length}
+          </span>
+        )}
       </div>
-      <table
-        role="table"
-        aria-labelledby={headingId}
-        className="exam-agenda w-full table-fixed text-left text-sm"
-      >
-        <colgroup>
-          <col className="w-[49%]" />
-          <col className="w-[30%]" />
-          <col />
-        </colgroup>
-        <thead className="sr-only">
-          <tr>
-            <th scope="col">Course</th>
-            <th scope="col">Time</th>
-            <th scope="col">Location</th>
-          </tr>
-        </thead>
-        {Array.from(dates, ([date, meetings]) => (
-          <tbody key={date} role="rowgroup">
-            <tr role="row">
-              <th
-                scope="rowgroup"
-                colSpan={3}
-                className="rounded bg-muted/60 px-3 py-2 text-xs font-medium text-muted-foreground"
-              >
-                <span className="flex items-center gap-2">
-                  <CalendarDays aria-hidden="true" size={14} />
-                  {date}
-                </span>
-              </th>
+      {exams.length > 0 && (
+        <table
+          role="table"
+          aria-labelledby={headingId}
+          className="exam-agenda w-full table-fixed text-left text-sm"
+        >
+          <colgroup>
+            <col className="w-[49%]" />
+            <col className="w-[30%]" />
+            <col />
+          </colgroup>
+          <thead className="sr-only">
+            <tr>
+              <th scope="col">Course</th>
+              <th scope="col">Time</th>
+              <th scope="col">Location</th>
             </tr>
-            {meetings.map((exam) => {
-              const related = conflictIds.get(exam.id);
-              const courseName = exam.courseTitle.startsWith(exam.courseCode)
-                ? exam.courseTitle
-                    .slice(exam.courseCode.length)
-                    .replace(/^[\s:–—-]+/, "")
-                : exam.courseTitle;
-              return (
-                <tr key={exam.id} role="row" className="exam-entry">
-                  <td role="cell" className="exam-course px-3 py-3.5">
-                    <div className="flex items-baseline gap-2.5">
-                      <span
-                        aria-hidden="true"
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: exam.color }}
-                      />
-                      <div className="min-w-0 break-words">
-                        <span className="font-semibold">{exam.courseCode}</span>
-                        {courseName && (
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {courseName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td
-                    role="cell"
-                    aria-describedby={related?.join(" ")}
-                    className="exam-time px-3 py-3.5"
-                  >
-                    <span className="flex items-start gap-2 tabular-nums">
-                      {related ? (
-                        <AlertTriangle
-                          aria-label="Exam time conflict"
-                          size={15}
-                          className="mt-0.5 shrink-0 text-amber-700 dark:text-amber-300"
+          </thead>
+          {Array.from(dates, ([date, meetings]) => (
+            <tbody key={date} role="rowgroup">
+              <tr role="row">
+                <th
+                  scope="rowgroup"
+                  colSpan={3}
+                  className="rounded bg-muted/60 px-3 py-2 text-xs font-medium text-muted-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <CalendarDays aria-hidden="true" size={14} />
+                    {date}
+                  </span>
+                </th>
+              </tr>
+              {meetings.map((exam) => {
+                const related = conflictIds.get(exam.id);
+                const courseName = exam.courseTitle.startsWith(exam.courseCode)
+                  ? exam.courseTitle
+                      .slice(exam.courseCode.length)
+                      .replace(/^[\s:–—-]+/, "")
+                  : exam.courseTitle;
+                return (
+                  <tr key={exam.id} role="row" className="exam-entry">
+                    <td role="cell" className="exam-course px-3 py-3.5">
+                      <div className="flex items-baseline gap-2.5">
+                        <span
+                          aria-hidden="true"
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: exam.color }}
                         />
-                      ) : (
-                        <Clock3
+                        <div className="min-w-0 break-words">
+                          <span className="font-semibold">{exam.courseCode}</span>
+                          {courseName && (
+                            <p className="mt-0.5 text-sm text-muted-foreground">
+                              {courseName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      role="cell"
+                      aria-describedby={related?.join(" ")}
+                      className="exam-time px-3 py-3.5"
+                    >
+                      <span className="flex items-start gap-2 tabular-nums">
+                        {related ? (
+                          <AlertTriangle
+                            aria-label="Exam time conflict"
+                            size={15}
+                            className="mt-0.5 shrink-0 text-amber-700 dark:text-amber-300"
+                          />
+                        ) : (
+                          <Clock3
+                            aria-hidden="true"
+                            size={15}
+                            className="mt-0.5 shrink-0 text-muted-foreground"
+                          />
+                        )}
+                        {exam.timeLabel}
+                      </span>
+                    </td>
+                    <td role="cell" className="exam-location px-3 py-3.5">
+                      <span className="flex items-start gap-1.5 break-words text-muted-foreground">
+                        <MapPin
                           aria-hidden="true"
                           size={15}
-                          className="mt-0.5 shrink-0 text-muted-foreground"
+                          className="mt-0.5 shrink-0"
                         />
-                      )}
-                      {exam.timeLabel}
-                    </span>
-                  </td>
-                  <td role="cell" className="exam-location px-3 py-3.5">
-                    <span className="flex items-start gap-1.5 break-words text-muted-foreground">
-                      <MapPin
-                        aria-hidden="true"
-                        size={15}
-                        className="mt-0.5 shrink-0"
-                      />
-                      {exam.location}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        ))}
-      </table>
+                        {exam.location}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
+        </table>
+      )}
+      {children}
     </section>
   );
 }
@@ -171,6 +179,7 @@ export default function ExamSchedule({
   exams,
   conflicts,
   missingCourses,
+  coursesWithoutMidterms,
   courseCount,
   hasDraftCourses,
   examOnlyCourses = [],
@@ -203,6 +212,8 @@ export default function ExamSchedule({
     );
   }
 
+  const midterms = exams.filter((exam) => exam.type === "midterm");
+  const finals = exams.filter((exam) => exam.type === "final");
   return (
     <div className="space-y-6 px-3 py-4 sm:px-5 sm:py-5">
       {conflicts.length > 0 && (
@@ -238,31 +249,22 @@ export default function ExamSchedule({
           </ul>
         </details>
       )}
-      {missingCourses.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          Exam details weren’t saved for{" "}
-          {missingCourses.map((course) => course.title).join(", ")}. Generate a
-          new schedule or re-add these courses to load their exams.
-        </p>
-      )}
-      {(["midterm", "final"] as const).map((type) => {
-        const sittings = exams.filter((exam) => exam.type === type);
-        return (
-          sittings.length > 0 && (
-            <ExamDates
-              key={type}
-              title={type === "midterm" ? "Midterms" : "Finals"}
-              exams={sittings}
-              conflictIds={conflictIds}
-            />
-          )
-        );
-      })}
-      {!exams.length && missingCourses.length < courseCount && (
-        <p className="text-sm text-muted-foreground">
-          No published exam dates for{" "}
-          {missingCourses.length ? "the other courses" : "this schedule"}.
-        </p>
+      <ExamDates title="Midterms" exams={midterms} conflictIds={conflictIds}>
+        {coursesWithoutMidterms.length > 0 && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            No midterms listed for {coursesWithoutMidterms.join(", ")}.
+          </p>
+        )}
+        {missingCourses.length > 0 && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Exam details weren’t saved for{" "}
+            {missingCourses.map((course) => course.title).join(", ")}. Generate a
+            new schedule or re-add these courses to load their exams.
+          </p>
+        )}
+      </ExamDates>
+      {finals.length > 0 && (
+        <ExamDates title="Finals" exams={finals} conflictIds={conflictIds} />
       )}
       {examOnlyCourses.length > 0 && (
         <section>

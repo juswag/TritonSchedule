@@ -100,6 +100,7 @@ export function getExamSchedule(events: CalendarEvent[], examOnlyCourses: Calend
   exams: ScheduledExam[];
   conflicts: ExamConflict[];
   missingCourses: { id: string; title: string }[];
+  coursesWithoutMidterms: string[];
 } {
   const courses = new Map<string, CalendarEvent[]>();
   for (const event of events) {
@@ -108,6 +109,7 @@ export function getExamSchedule(events: CalendarEvent[], examOnlyCourses: Calend
     courses.set(id, [...(courses.get(id) ?? []), event]);
   }
   const exams: ScheduledExam[] = [];
+  const coursesWithoutMidterms = new Set<string>();
   const missingCourses: { id: string; title: string }[] = [];
   const scheduledCourses = new Map<string, { id: string; title: string; color: string; exams?: CalendarExam[] }>(
     examOnlyCourses.map((course) => [course.id, course]),
@@ -126,7 +128,11 @@ export function getExamSchedule(events: CalendarEvent[], examOnlyCourses: Calend
       continue;
     }
     const sittings = new Map<string, ScheduledExam>();
-    for (const exam of course.exams.filter(isExam)) {
+    const courseExams = course.exams.filter(isExam);
+    if (!courseExams.some((exam) => exam.type === "midterm")) {
+      coursesWithoutMidterms.add(getCourseCode(courseTitle));
+    }
+    for (const exam of courseExams) {
       const schedule = parseExamSchedule(exam.time);
       const key = JSON.stringify([exam.type, schedule.start ?? exam.time, schedule.end,
         schedule.start === null ? exam.id : null]);
@@ -165,5 +171,5 @@ export function getExamSchedule(events: CalendarEvent[], examOnlyCourses: Calend
       }
     }
   }
-  return { exams, conflicts, missingCourses };
+  return { exams, conflicts, missingCourses, coursesWithoutMidterms: [...coursesWithoutMidterms] };
 }

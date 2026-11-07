@@ -61,7 +61,16 @@ describe("exam tab", () => {
     mount([{ ...courses[0], exams: undefined }]);
     openExams();
     expect(screen.getByText(/re-add these courses/)).toBeInTheDocument();
+    expect(screen.queryByText(/No midterms listed/)).not.toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Finals" })).toBeNull();
+  });
+  it("keeps Midterms visible for a schedule with only a final", () => {
+    mount([{ ...courses[0], exams: courses[0].exams!.filter((exam) => exam.type === "final") }]);
+    openExams();
+    const midterms = within(screen.getByRole("region", { name: "Midterms" }));
+    expect(midterms.getByText("No midterms listed for CSE 11.")).toBeVisible();
+    expect(midterms.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("table", { name: "Finals" })).toBeVisible();
   });
   it("shows an empty schedule state", () => {
     mount([]);
