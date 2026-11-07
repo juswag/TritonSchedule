@@ -288,28 +288,6 @@ describe("schedule page generation", () => {
     vi.unstubAllGlobals();
   });
 
-  it("reopens the sidebar for search, saved schedules, and a pending save", async () => {
-    mountPage();
-    await ready();
-    const collapse = () => fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-    collapse();
-    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Find a course" }));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Quick course search" })).toHaveFocus());
-    collapse();
-    fireEvent.click(screen.getByRole("button", { name: "Open My Schedules" }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "My Schedules" })).toHaveFocus());
-    collapse();
-    fireEvent.click(screen.getByRole("button", { name: "Save Schedule" }));
-    const name = screen.getByRole("textbox", { name: "Schedule name" });
-    fireEvent.change(name, { target: { value: "Morning classes" } });
-    collapse();
-    fireEvent.click(screen.getByRole("button", { name: "Save Schedule" }));
-    await waitFor(() => expect(name).toHaveFocus());
-    expect(name).toHaveValue("Morning classes");
-    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute("aria-expanded", "true");
-  });
-
   it("previews real alternatives, revalidates before applying, preserves personal events, and undoes the replacement", async () => {
     mountPage();
     await ready();

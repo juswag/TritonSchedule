@@ -99,7 +99,8 @@ export function WeekCalendar({
       const height = Math.max(
         320,
         window.innerHeight -
-          (calendarRef.current.getBoundingClientRect().top + window.scrollY),
+          (calendarRef.current.getBoundingClientRect().top + window.scrollY) -
+          26,
       );
       const header = headerRef.current?.getBoundingClientRect().height || 45;
       setViewportSpace((current) =>
