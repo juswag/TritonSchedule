@@ -64,6 +64,8 @@ const savedPlan = z.object({
         courseKey: z.string().optional(),
         term: z.string().optional(),
         eventType: z.string().optional(),
+        sectionCode: z.string().optional(),
+        instructor: z.string().optional(),
         location: z.string().optional(),
       }),
     )

@@ -176,6 +176,7 @@ describe("schedule generation", () => {
     const lecture = option("lecture", 0, 540, 600);
     const discussion = option("discussion", 1, 700, 750);
     const lab = option("lab", 3, 900, 1010);
+    lab.sections[0].instructor = "Lab Instructor";
     const bundle = {
       id: "package",
       sections: [...lecture.sections, ...discussion.sections, ...lab.sections],
@@ -184,6 +185,12 @@ describe("schedule generation", () => {
     const result = collect([course("A", [bundle])]);
     expect(result).toHaveLength(1);
     expect(result[0].events).toHaveLength(3);
+    expect(
+      result[0].events.find((event) => event.dayOfWeek === "Thu"),
+    ).toMatchObject({
+      sectionCode: "lab",
+      instructor: "Lab Instructor",
+    });
     expect(result[0].choices).toEqual([
       { courseKey: "A", optionId: "package" },
     ]);

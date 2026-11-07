@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getCourseCode } from "@/lib/courseLabels";
 import { WeekCalendar } from "@/components/schedule/WeekCalendar";
@@ -34,6 +34,38 @@ describe("calendar class blocks", () => {
     expect(parseFloat(block.parentElement!.style.height)).toBeCloseTo(
       (50 / 60) * 64,
     );
+  });
+
+  it("opens section details with only the days that share this meeting time and room", () => {
+    const meeting = {
+      ...lecture,
+      courseId: "a",
+      sectionCode: "A00",
+      instructor: "Professor Lin",
+    };
+    renderSchedule([
+      meeting,
+      { ...meeting, id: "thursday", dayOfWeek: "Thu" },
+      {
+        ...meeting,
+        id: "friday",
+        dayOfWeek: "Fri",
+        startTime: "10:00",
+        endTime: "10:50",
+      },
+      { ...meeting, id: "saturday", dayOfWeek: "Sat", location: "WLH 2001" },
+    ]);
+    fireEvent.click(
+      screen.getByRole("button", { name: /View CSE 100.*Tuesday/ }),
+    );
+    const details = screen.getByRole("dialog", { name: lecture.title });
+    expect(within(details).getByText("Lecture · Section A00")).toBeVisible();
+    expect(within(details).getByText("Professor Lin")).toBeVisible();
+    expect(within(details).getByText("Tue, Thu")).toBeVisible();
+    fireEvent.click(
+      within(details).getByRole("button", { name: "Close meeting details" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("prioritizes course labels over meeting types when blocks overlap", () => {

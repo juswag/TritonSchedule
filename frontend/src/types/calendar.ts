@@ -10,6 +10,8 @@ export interface CalendarEvent {
   courseKey?: string;
   term?: string;
   eventType?: string;
+  sectionCode?: string;
+  instructor?: string;
   location?: string;
   /** Original course label, shared by lecture and section events. */
   courseTitle?: string;

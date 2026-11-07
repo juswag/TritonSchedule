@@ -1096,6 +1096,8 @@ function courseScheduleToEvents(course: Course, color: string): CalendarEvent[] 
       isCourse: true,
       courseId: course.id,
       eventType: "Lecture",
+      sectionCode: meeting.sectionCode || course.sectionCode,
+      instructor: course.instructor,
       location: meeting.location?.trim() || "TBA",
     }));
   });
@@ -1122,6 +1124,7 @@ function sectionScheduleToEvents(
     isCourse: true,
     courseId: course.id,
     eventType,
+    sectionCode: section.sectionCode,
     location: section.location?.trim() || "TBA",
   }));
 }

@@ -1,14 +1,21 @@
 import {
   type CSSProperties,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { MapPin, Trash2 } from "lucide-react";
+import { MapPin, Trash2, X } from "lucide-react";
 import type { CalendarEvent, Weekday } from "@/types/calendar";
 import { cn } from "@/lib/utils";
 import { getCourseCode } from "@/lib/courseLabels";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Close as PopoverClose } from "@radix-ui/react-popover";
 import { useLayoutMotion } from "@/hooks/useLayoutMotion";
 
 const HOUR_HEIGHT = 64;
@@ -223,7 +230,7 @@ export function WeekCalendar({
                 data-course-key={event.courseKey}
                 data-changed={changedIds.has(event.id) || undefined}
                 className={cn(
-                  "flex items-start gap-3 px-4 py-4 transition-opacity motion-reduce:transition-none",
+                  "relative flex items-start gap-3 px-4 py-4 transition-opacity motion-reduce:transition-none",
                   highlightedCourse &&
                     event.courseKey !== highlightedCourse &&
                     "opacity-30",
@@ -248,11 +255,12 @@ export function WeekCalendar({
                     </p>
                   )}
                 </div>
+                <MeetingDetails key={event.id} event={event} events={events} />
                 {onRemove && (
                   <button
                     type="button"
                     onClick={() => onRemove(event)}
-                    className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="relative z-10 rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     aria-label={`Remove ${event.title}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -347,7 +355,9 @@ export function WeekCalendar({
                         data-course-key={event.courseKey}
                         data-changed={changedIds.has(event.id) || undefined}
                         className={cn(
-                          "absolute z-10 p-0.5 transition-opacity motion-reduce:transition-none",
+                          "meeting-slot absolute z-10 p-0.5 transition-opacity motion-reduce:transition-none",
+                          changedIds.has(event.id) &&
+                            "schedule-meeting-changed",
                           highlightedCourse &&
                             event.courseKey !== highlightedCourse &&
                             "opacity-25",
@@ -361,9 +371,7 @@ export function WeekCalendar({
                       >
                         <div
                           className={cn(
-                            "schedule-event group relative flex h-full flex-col overflow-hidden rounded-md border px-2.5",
-                            changedIds.has(event.id) &&
-                              "schedule-meeting-changed",
+                            "schedule-event meeting-surface group relative flex h-full flex-col overflow-hidden rounded-md border px-2.5",
                             highlightedCourse === event.courseKey &&
                               "ring-2 ring-current ring-offset-1",
                             style.height >= 72
@@ -407,11 +415,16 @@ export function WeekCalendar({
                               </span>
                             </div>
                           )}
+                          <MeetingDetails
+                            key={event.id}
+                            event={event}
+                            events={events}
+                          />
                           {onRemove && (
                             <button
                               type="button"
                               onClick={() => onRemove(event)}
-                              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-card/95 text-muted-foreground opacity-0 shadow-sm transition hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+                              className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded bg-card/95 text-muted-foreground opacity-0 shadow-sm transition hover:text-destructive focus:opacity-100 group-hover:opacity-100"
                               aria-label={`Remove ${event.title}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -430,6 +443,115 @@ export function WeekCalendar({
     </div>
   );
 }
+function MeetingDetails({
+  event,
+  events,
+}: {
+  event: CalendarEvent;
+  events: CalendarEvent[];
+}) {
+  const headingId = useId();
+  const day = WEEK_DAYS.find((day) => day.key === event.dayOfWeek)?.label;
+  return (
+    <Popover>
+      <PopoverTrigger
+        className="absolute inset-0 cursor-pointer rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+        aria-label={`View ${event.title}, ${day} at ${formatTo12Hour(event.startTime)}`}
+        title=""
+      />
+      <PopoverContent
+        aria-labelledby={headingId}
+        align="start"
+        sideOffset={6}
+        collisionPadding={12}
+        className="w-80 max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto rounded-lg p-0 data-[state=closed]:!animate-none motion-reduce:!animate-none"
+      >
+        <div className="relative px-4 pb-3 pt-4 pr-12">
+          {event.eventType && (
+            <p className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: event.color }}
+              />
+              {event.eventType}
+              {event.sectionCode && ` · Section ${event.sectionCode}`}
+            </p>
+          )}
+          <h3
+            id={headingId}
+            className="break-words text-base font-semibold leading-snug"
+          >
+            {event.title}
+          </h3>
+          <PopoverClose
+            aria-label="Close meeting details"
+            className="absolute right-1.5 top-1.5 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <X size={16} aria-hidden="true" />
+          </PopoverClose>
+        </div>
+        <MeetingFacts event={event} events={events} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function MeetingFacts({
+  event,
+  events,
+}: {
+  event: CalendarEvent;
+  events: CalendarEvent[];
+}) {
+  const course = event.courseId || event.courseKey;
+  const matchingDays = new Set(
+    events
+      .filter(
+        (other) =>
+          other.id === event.id ||
+          (event.isCourse &&
+            course &&
+            other.isCourse &&
+            (other.courseId || other.courseKey) === course &&
+            other.term === event.term &&
+            other.sectionCode === event.sectionCode &&
+            other.eventType === event.eventType &&
+            other.location === event.location &&
+            other.startTime === event.startTime &&
+            other.endTime === event.endTime),
+      )
+      .map((meeting) => meeting.dayOfWeek),
+  );
+  const days = WEEK_DAYS.filter((day) => matchingDays.has(day.key));
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-2 border-t border-border px-4 py-3 text-sm [&>dt]:text-muted-foreground [&>dd]:break-words">
+      <dt>{event.isCourse ? "Meets" : "Day"}</dt>
+      <dd>
+        {days
+          .map((day) => (days.length === 1 ? day.label : day.shortLabel))
+          .join(", ")}
+      </dd>
+      <dt>Time</dt>
+      <dd>
+        {formatTo12Hour(event.startTime)} – {formatTo12Hour(event.endTime)}
+      </dd>
+      {(event.isCourse || event.location) && (
+        <>
+          <dt>Location</dt>
+          <dd>{event.location || "Location unavailable"}</dd>
+        </>
+      )}
+      {event.instructor && (
+        <>
+          <dt>Instructor</dt>
+          <dd>{event.instructor}</dd>
+        </>
+      )}
+    </dl>
+  );
+}
+
 function formatHour(hour: number): string {
   if (hour === 0) return "12 AM";
   if (hour === 12) return "12 PM";

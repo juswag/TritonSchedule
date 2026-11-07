@@ -150,27 +150,34 @@ function normalizeOptions(
 }
 
 export function optionEvents({ course, option }: Choice): CalendarEvent[] {
-  return option.meetings.map((meeting) => ({
-    id: JSON.stringify([
-      course.key,
-      meeting.sectionId,
-      meeting.day,
-      meeting.start,
-      meeting.end,
-    ]),
-    title: `${course.code}: ${course.title}`,
-    ...(option.exams && { exams: option.exams }),
-    dayOfWeek: DAYS[meeting.day],
-    startTime: clock(meeting.start),
-    endTime: clock(meeting.end),
-    color: courseColor(course.key),
-    isCourse: true,
-    courseKey: course.key,
-    courseId: option.sections[0].id,
-    term: course.term,
-    eventType: meeting.type,
-    location: meeting.location,
-  }));
+  return option.meetings.map((meeting) => {
+    const section = option.sections.find(
+      (item) => item.id === meeting.sectionId,
+    );
+    return {
+      id: JSON.stringify([
+        course.key,
+        meeting.sectionId,
+        meeting.day,
+        meeting.start,
+        meeting.end,
+      ]),
+      title: `${course.code}: ${course.title}`,
+      ...(option.exams && { exams: option.exams }),
+      dayOfWeek: DAYS[meeting.day],
+      startTime: clock(meeting.start),
+      endTime: clock(meeting.end),
+      color: courseColor(course.key),
+      isCourse: true,
+      courseKey: course.key,
+      courseId: option.sections[0].id,
+      term: course.term,
+      eventType: meeting.type,
+      sectionCode: section?.code,
+      instructor: section?.instructor,
+      location: meeting.location,
+    };
+  });
 }
 
 function toSchedule(chosen: Choice[]): GeneratedSchedule {
