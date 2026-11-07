@@ -11,6 +11,39 @@
   min-height: clamp(14rem, 50svh, 28rem);
 }
 
+.plan-sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 8px 20px;
+}
+.plan-sidebar-toggle {
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  color: hsl(var(--muted-foreground));
+}
+.plan-sidebar-toggle:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.plan-sidebar-toggle:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+}
+.plan-sidebar-shortcuts {
+  display: none;
+}
+.plan-sidebar-scroll {
+  padding: 0 20px 12px;
+}
+.plan-sidebar-footer {
+  padding: 6px 8px;
+  border-top: 1px solid hsl(var(--border));
+}
 .plan-shelf {
   margin-top: 24px;
   padding-top: 16px;
@@ -195,20 +228,47 @@
     min-height: 100%;
   }
   .plan-workspace {
-    height: calc(100dvh - 112px);
+    height: calc(100dvh - 72px);
     min-height: 320px;
+    grid-template-columns: clamp(17rem, 22vw, 19rem) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
+  .plan-workspace[data-sidebar-collapsed="true"] {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  .plan-workspace[data-sidebar-collapsed="true"] :is(.plan-sidebar-heading h2, .plan-sidebar-heading span, .plan-sidebar-content) {
+    display: none;
+  }
+  .plan-workspace[data-sidebar-collapsed="true"] .plan-sidebar-heading {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .plan-workspace[data-sidebar-collapsed="true"] .plan-sidebar-shortcuts {
+    display: grid;
+    justify-content: center;
+    gap: 4px;
+  }
+  .plan-sidebar-shortcuts button {
+    display: inline-flex;
+  }
   .plan-sidebar,
+  .plan-sidebar-content,
+  .plan-sidebar-scroll,
   .plan-shelf {
     display: flex;
     flex-direction: column;
     min-height: 0;
   }
-  .plan-sidebar {
-    overflow-y: auto;
+  .plan-sidebar-content,
+  .plan-sidebar-scroll {
+    flex: 1;
   }
-  .plan-sidebar > :not(.plan-shelf),
+  .plan-sidebar-scroll {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .plan-sidebar-scroll > :not(.plan-shelf),
+  .plan-sidebar-footer,
   .plan-shelf > :not(.plan-list) {
     flex: none;
   }
@@ -264,6 +324,9 @@
   }
 }
 @media (max-width: 1023px) {
+  .plan-sidebar[data-mobile-expanded="false"] .plan-sidebar-content {
+    display: none;
+  }
   .plan-shelf {
     margin-top: 14px;
     padding-top: 10px;

@@ -215,7 +215,7 @@ export function SavedScheduleShelf({
   return (
     <section className="plan-shelf" aria-labelledby="saved-heading">
       <div className="flex min-h-9 items-center gap-2">
-        <h2 id="saved-heading" className="text-sm font-semibold">
+        <h2 id="saved-heading" tabIndex={-1} className="text-sm font-semibold">
           My Schedules
         </h2>
         <span className="text-xs tabular-nums text-muted-foreground">

@@ -24,6 +24,10 @@ import "@/components/schedule/savedSchedules.css";
 import {
   AlertTriangle,
   CalendarPlus,
+  Bookmark,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
   CalendarDays,
   ClipboardList,
   Eraser,
@@ -168,6 +172,7 @@ export default function CalendarPage() {
   const coursesRef = useRef<HTMLElement>(null);
   const [sort, setSort] = useState("gaps");
   const [coursesExpanded, setCoursesExpanded] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [highlightedCourse, setHighlightedCourse] = useState<string | null>(
     null,
   );
@@ -361,8 +366,12 @@ export default function CalendarPage() {
       resultsRef.current?.scrollIntoView?.({ block: "start" });
     });
   }
-  function editCourses() {
+  function revealSidebar() {
+    setSidebarCollapsed(false);
     setCoursesExpanded(true);
+  }
+  function editCourses() {
+    revealSidebar();
     setHighlightedCourse(null);
     requestAnimationFrame(() =>
       coursesRef.current
@@ -449,6 +458,13 @@ export default function CalendarPage() {
 
   function openSave() {
     if (!canSavePlan) return;
+    revealSidebar();
+    if (saveDraft) {
+      requestAnimationFrame(() =>
+        coursesRef.current?.querySelector<HTMLInputElement>(".plan-form input")?.focus(),
+      );
+      return;
+    }
     if (previewing && shown) {
       setSaveDraft({
         courses: selected.map(({ key, term, code, title }) => ({
@@ -834,119 +850,223 @@ export default function CalendarPage() {
   return (
     <div
       data-preview-motion={hasPreviewMotionOverride() ? "full" : undefined}
-      className="schedule-workspace min-h-[calc(100vh-72px)] bg-[#fcfdff] dark:bg-background px-4 py-4 sm:px-6 sm:py-5"
+      className="schedule-workspace min-h-[calc(100vh-72px)] bg-card"
     >
       <h1 className="sr-only">Schedule</h1>
-      <div className="plan-workspace grid w-full items-stretch bg-card lg:grid-cols-[minmax(280px,328px)_minmax(0,1fr)]">
+      <div
+        className="plan-workspace grid w-full items-stretch border-t border-border"
+        data-sidebar-collapsed={sidebarCollapsed}
+      >
         <aside
           ref={coursesRef}
-          className="plan-sidebar min-w-0 border-b border-border bg-muted/30 px-4 py-3 lg:border-b-0 lg:border-r lg:px-5"
+          className="plan-sidebar min-w-0 border-b border-border bg-muted/60 lg:border-b-0 lg:border-r"
           aria-label="Courses to schedule"
+          data-mobile-expanded={coursesExpanded}
         >
-          <button
-            type="button"
-            onClick={() => {
-              setCoursesExpanded((open) => !open);
-              setHighlightedCourse(null);
-            }}
-            aria-expanded={coursesExpanded}
-            aria-controls="schedule-course-controls"
-            className="mb-3 flex min-h-11 w-full items-center justify-between rounded-md border border-border bg-card px-3 text-sm font-medium lg:hidden"
-          >
-            <span>
-              {visibleCourses.length}{" "}
-              {visibleCourses.length === 1 ? "course" : "courses"}
+          <div className="plan-sidebar-heading">
+            <h2 className="text-base font-semibold">Your courses</h2>
+            <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+              {visibleCourses.length} selected
             </span>
-            <span className="flex items-center gap-2 text-primary">
-              {coursesExpanded ? "Hide" : "Edit"}
-              <ChevronDown
-                className={`h-4 w-4 transition-transform motion-reduce:transition-none ${coursesExpanded ? "rotate-180" : ""}`}
-              />
-            </span>
-          </button>
-          <div
-            id="schedule-course-controls"
-            className={`${coursesExpanded ? "flex schedule-panel-open" : "hidden lg:flex"} flex-col`}
-          >
-            <div className="mb-3 flex min-h-11 shrink-0 items-center justify-between gap-2">
-              <h2 className="text-base font-semibold">Your courses</h2>
-              <span className="text-xs text-muted-foreground">
-                {visibleCourses.length} selected
-              </span>
-            </div>
-            <div className="shrink-0">
-              <CourseQuickSearch
-                key={searchReset}
-                term={term}
-                selectedKeys={visibleCourses.map((c) => c.key)}
-                onAdd={(course) => changeCourses([...visibleCourses, course])}
-                disabled={!term || applying || visibleCourses.length >= 12}
-              />
-            </div>
-            {termError && (
-              <div role="alert" className="mt-3 text-sm text-destructive">
-                {termError}
-                <button
-                  onClick={() => setTermAttempt((n) => n + 1)}
-                  className="ml-2 underline"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <ul className="mt-2 min-h-0 divide-y divide-border empty:hidden lg:max-h-[50dvh] lg:overflow-y-auto lg:overscroll-contain">
-              {visibleCourses.map((course) => (
-                <li
-                  key={course.key}
-                  data-motion-key={`course:${course.key}`}
-                  className="py-1"
-                  onMouseEnter={() => setHighlightedCourse(course.key)}
-                  onMouseLeave={() => setHighlightedCourse(null)}
-                  onFocus={() => setHighlightedCourse(course.key)}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget))
-                      setHighlightedCourse(null);
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="plan-sidebar-toggle hidden lg:inline-flex"
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="schedule-sidebar-content"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCoursesExpanded((open) => !open);
+                setHighlightedCourse(null);
+              }}
+              aria-expanded={coursesExpanded}
+              aria-controls="schedule-sidebar-content"
+              aria-label={`${visibleCourses.length} ${visibleCourses.length === 1 ? "course" : "courses"} ${coursesExpanded ? "Hide" : "Edit"}`}
+              className="plan-sidebar-toggle inline-flex lg:hidden"
+            >
+              <ChevronDown size={18} className={coursesExpanded ? "rotate-180" : ""} />
+            </button>
+          </div>
+          <div className="plan-sidebar-shortcuts">
+            <button
+              type="button"
+              className="plan-sidebar-toggle"
+              aria-label="Find a course"
+              title="Find a course"
+              onClick={editCourses}
+              disabled={!term || applying || visibleCourses.length >= 12}
+            >
+              <Search size={18} />
+            </button>
+            <button
+              type="button"
+              className="plan-sidebar-toggle"
+              aria-label="Open My Schedules"
+              title="My Schedules"
+              onClick={() => {
+                revealSidebar();
+                requestAnimationFrame(() =>
+                  coursesRef.current?.querySelector<HTMLElement>("#saved-heading")?.focus(),
+                );
+              }}
+            >
+              <Bookmark size={18} />
+            </button>
+          </div>
+          <div id="schedule-sidebar-content" className="plan-sidebar-content">
+            <div className="plan-sidebar-scroll">
+              <div id="schedule-course-controls" className="flex flex-col">
+                <div className="shrink-0">
+                  <CourseQuickSearch
+                    key={searchReset}
+                    term={term}
+                    selectedKeys={visibleCourses.map((c) => c.key)}
+                    onAdd={(course) => changeCourses([...visibleCourses, course])}
+                    disabled={!term || applying || visibleCourses.length >= 12}
+                  />
+                </div>
+                {termError && (
+                  <div role="alert" className="mt-3 text-sm text-destructive">
+                    {termError}
                     <button
-                      type="button"
-                      aria-label={`Highlight ${course.code}`}
-                      onClick={() =>
-                        setHighlightedCourse((current) =>
-                          current === course.key ? null : course.key,
-                        )
-                      }
-                      className="flex min-h-11 items-center gap-2 rounded text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                      onClick={() => setTermAttempt((n) => n + 1)}
+                      className="ml-2 underline"
                     >
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: colors.get(course.key) }}
-                      />
-                      {course.code}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={applying}
-                      onClick={() => removeCourse(course.key)}
-                      aria-label={`Remove ${course.code}`}
-                      className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
+                      Retry
                     </button>
                   </div>
-                </li>
-              ))}
-            </ul>
-            <div
-              data-motion-key="course-actions"
-              className={`mt-4 shrink-0 ${visibleCourses.length ? "border-t border-border pt-4" : ""}`}
-            >
-              {visibleCourses.length === 12 && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Up to 12 courses per search.
-                </p>
-              )}
+                )}
+                <ul className="mt-1 min-h-0 empty:hidden">
+                  {visibleCourses.map((course) => (
+                    <li
+                      key={course.key}
+                      data-motion-key={`course:${course.key}`}
+                      className="rounded-md px-2 hover:bg-muted focus-within:bg-muted"
+                      onMouseEnter={() => setHighlightedCourse(course.key)}
+                      onMouseLeave={() => setHighlightedCourse(null)}
+                      onFocus={() => setHighlightedCourse(course.key)}
+                      onBlur={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget))
+                          setHighlightedCourse(null);
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Highlight ${course.code}`}
+                          onClick={() =>
+                            setHighlightedCourse((current) =>
+                              current === course.key ? null : course.key,
+                            )
+                          }
+                          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ background: colors.get(course.key) }}
+                          />
+                          {course.code}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={applying}
+                          onClick={() => removeCourse(course.key)}
+                          aria-label={`Remove ${course.code}`}
+                          className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div
+                  data-motion-key="course-actions"
+                  className="mt-2 shrink-0"
+                >
+                  {visibleCourses.length === 12 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Up to 12 courses per search.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={generate}
+                    disabled={!visibleCourses.length || !term || applying || busy}
+                    className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 ${previewing ? "border border-border bg-card text-primary hover:bg-primary/5" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+                  >
+                    <CalendarPlus aria-hidden="true" className="h-4 w-4" />
+                    {busy
+                      ? "Finding schedules…"
+                      : schedules.length
+                        ? "Generate again"
+                        : "Generate schedules"}
+                  </button>
+                </div>
+              </div>
+              {!savedPreview &&
+                !previewing &&
+                (notice || canUndoScheduleChange) && (
+                  <div
+                    data-motion-key="schedule-feedback"
+                    className="mt-3 space-y-2"
+                  >
+                    {(notice || canUndoScheduleChange) && (
+                      <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                        <p
+                          role="status"
+                          key={notice}
+                          className="schedule-feedback min-w-0 flex-1 text-muted-foreground"
+                        >
+                          {notice}
+                        </p>
+                        {canUndoScheduleChange && (
+                          <button
+                            type="button"
+                            disabled={applying || !term}
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-40"
+                            onClick={() => {
+                              const previousSelection = undoScheduleChange();
+                              if (previousSelection) setSelected(previousSelection);
+                              setPreviewing(false);
+                              setNotice("Previous schedule restored.");
+                            }}
+                          >
+                            <Undo2 aria-hidden="true" className="h-4 w-4" />
+                            Undo
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              <SavedScheduleShelf
+                key={term}
+                plans={library.plans}
+                activeId={activePlan?.id}
+                previewId={previewing ? "generated" : savedPreview?.id}
+                colors={colors}
+                draft={saveDraft}
+                canSave={canSavePlan}
+                applying={applying}
+                error={library.error}
+                update={library.update}
+                onOpen={openSave}
+                onCancel={() => setSaveDraft(null)}
+                onPreview={previewPlan}
+                onSaved={(plan) => {
+                  setSaveDraft(null);
+                  previewPlan(plan);
+                }}
+              />
+            </div>
+            <div className="plan-sidebar-footer">
               <button
                 type="button"
                 onClick={clearWorkingSchedule}
@@ -959,81 +1079,13 @@ export default function CalendarPage() {
                     termExamCourses.length
                   )
                 }
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-primary/25 bg-card px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-primary disabled:opacity-50"
               >
                 <Eraser aria-hidden="true" className="h-4 w-4" />
                 Clear Schedule
               </button>
-              <button
-                type="button"
-                onClick={generate}
-                disabled={!visibleCourses.length || !term || applying || busy}
-                className={`mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 ${previewing ? "border border-border bg-card text-primary hover:bg-primary/5" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
-              >
-                <CalendarPlus aria-hidden="true" className="h-4 w-4" />
-                {busy
-                  ? "Finding schedules…"
-                  : schedules.length
-                    ? "Generate again"
-                    : "Generate schedules"}
-              </button>
             </div>
           </div>
-          {!savedPreview &&
-            !previewing &&
-            (notice || canUndoScheduleChange) && (
-              <div
-                data-motion-key="schedule-feedback"
-                className="mt-3 space-y-2"
-              >
-                {(notice || canUndoScheduleChange) && (
-                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
-                    <p
-                      role="status"
-                      key={notice}
-                      className="schedule-feedback min-w-0 flex-1 text-muted-foreground"
-                    >
-                      {notice}
-                    </p>
-                    {canUndoScheduleChange && (
-                      <button
-                        type="button"
-                        disabled={applying || !term}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-40"
-                        onClick={() => {
-                          const previousSelection = undoScheduleChange();
-                          if (previousSelection) setSelected(previousSelection);
-                          setPreviewing(false);
-                          setNotice("Previous schedule restored.");
-                        }}
-                      >
-                        <Undo2 aria-hidden="true" className="h-4 w-4" />
-                        Undo
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          <SavedScheduleShelf
-            key={term}
-            plans={library.plans}
-            activeId={activePlan?.id}
-            previewId={previewing ? "generated" : savedPreview?.id}
-            colors={colors}
-            draft={saveDraft}
-            canSave={canSavePlan}
-            applying={applying}
-            error={library.error}
-            update={library.update}
-            onOpen={openSave}
-            onCancel={() => setSaveDraft(null)}
-            onPreview={previewPlan}
-            onSaved={(plan) => {
-              setSaveDraft(null);
-              previewPlan(plan);
-            }}
-          />
         </aside>
         <section
           ref={resultsRef}
