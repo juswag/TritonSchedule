@@ -24,7 +24,6 @@ import {
   AlertTriangle,
   CalendarPlus,
   Eraser,
-  Search,
   Check,
   ChevronLeft,
   ChevronDown,
@@ -806,7 +805,7 @@ export default function CalendarPage() {
                 </button>
               </div>
             )}
-            <ul className="mt-2 min-h-0 divide-y divide-border lg:max-h-[50dvh] lg:overflow-y-auto lg:overscroll-contain">
+            <ul className="mt-2 min-h-0 divide-y divide-border empty:hidden lg:max-h-[50dvh] lg:overflow-y-auto lg:overscroll-contain">
               {visibleCourses.map((course) => (
                 <li
                   key={course.key}
@@ -854,22 +853,9 @@ export default function CalendarPage() {
                 </li>
               ))}
             </ul>
-            {!visibleCourses.length && !termError && (
-              <div className="flex min-h-28 items-center justify-center py-6">
-                <button
-                  type="button"
-                  onClick={editCourses}
-                  disabled={!term}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50"
-                >
-                  <Search aria-hidden="true" className="h-4 w-4" />
-                  Find courses
-                </button>
-              </div>
-            )}
             <div
               data-motion-key="course-actions"
-              className="mt-4 shrink-0 border-t border-border pt-4"
+              className={`mt-4 shrink-0 ${visibleCourses.length ? "border-t border-border pt-4" : ""}`}
             >
               {visibleCourses.length === 12 && (
                 <p className="mt-2 text-xs text-muted-foreground">
