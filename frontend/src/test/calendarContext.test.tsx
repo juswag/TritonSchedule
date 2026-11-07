@@ -7,9 +7,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: vi.fn((key: string) => store[key] || null),
-    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
-    clear: () => { store = {}; },
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: () => {
+      store = {};
+    },
   };
 })();
 
@@ -156,13 +162,78 @@ describe("CalendarContext", () => {
     expect(result.current.events).toHaveLength(0);
   });
 
+  it("replaces all course meetings, keeps personal events, and restores courses with Undo", () => {
+    const oldCourse = {
+      id: "old",
+      title: "CSE 100",
+      dayOfWeek: "Mon" as const,
+      startTime: "09:00",
+      endTime: "10:00",
+      color: "blue",
+      isCourse: true,
+    };
+    const personal = {
+      ...oldCourse,
+      id: "personal",
+      title: "Appointment",
+      isCourse: false,
+    };
+    const replacement = {
+      ...oldCourse,
+      id: "new",
+      startTime: "11:00",
+      endTime: "12:00",
+    };
+    localStorageMock.setItem(
+      "calendarEvents",
+      JSON.stringify([oldCourse, personal]),
+    );
+    const { result } = renderHook(() => useCalendar(), {
+      wrapper: CalendarProvider,
+    });
+    act(() => result.current.replaceCourseEvents([replacement]));
+    expect(result.current.events).toEqual([personal, replacement]);
+    expect(JSON.parse(localStorageMock.getItem("calendarEvents")!)).toEqual([
+      personal,
+      replacement,
+    ]);
+    expect(result.current.canUndoScheduleChange).toBe(true);
+    const laterPersonal = { ...personal, id: "later" };
+    act(() => result.current.addEvent(laterPersonal));
+    act(() => result.current.undoScheduleChange());
+    expect(result.current.events).toEqual([personal, laterPersonal, oldCourse]);
+    expect(result.current.canUndoScheduleChange).toBe(false);
+    act(() => result.current.undoScheduleChange());
+    expect(result.current.events).toHaveLength(3);
+  });
+
+  it("invalidates Undo when course meetings are edited after applying", () => {
+    const course = {
+      id: "new",
+      title: "CSE 100",
+      dayOfWeek: "Mon" as const,
+      startTime: "09:00",
+      endTime: "10:00",
+      color: "blue",
+      isCourse: true,
+    };
+    const { result } = renderHook(() => useCalendar(), {
+      wrapper: CalendarProvider,
+    });
+    act(() => result.current.replaceCourseEvents([course]));
+    act(() => result.current.updateEvent("new", { startTime: "10:00" }));
+    expect(result.current.canUndoScheduleChange).toBe(false);
+  });
+
   it("should throw error when useCalendar is used outside provider", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
     expect(() => {
       renderHook(() => useCalendar());
     }).toThrow("useCalendar must be used within a CalendarProvider");
-    
+
     consoleError.mockRestore();
   });
 });

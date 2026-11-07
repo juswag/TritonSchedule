@@ -19,31 +19,31 @@ function mount(events = courses) {
   localStorage.setItem("calendarEvents", JSON.stringify(events));
   return render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
 }
+function expandConflicts() {
+  fireEvent.click(screen.getByText(/^\d+ exam conflicts?$/, { selector: "summary" }));
+}
 function openExams() {
   fireEvent.mouseDown(screen.getByRole("tab", { name: /Exams/ }), { button: 0, ctrlKey: false });
 }
 
 describe("exam tab", () => {
   beforeEach(() => localStorage.clear());
-  it("shows four courses, one persistent badge, and one compact notice scoped to the pair", () => {
+  it("groups exams by date and links each conflicting exam to its overlap", () => {
     mount([...courses, { ...courses[0], id: "second-lecture", dayOfWeek: "Wed" }]);
-    expect(screen.getByText("4 courses")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Weekly classes" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /Exams 1 conflict/ })).toBeInTheDocument();
     openExams();
+    expandConflicts();
     const midterms = screen.getByRole("table", { name: "Midterms" });
-    expect(within(midterms).getAllByRole("row")).toHaveLength(6);
-    expect(within(screen.getByRole("table", { name: "Finals" })).getAllByRole("row")).toHaveLength(5);
-    const notice = screen.getByText("CSE 11 and MATH 20A overlap");
-    expect(notice.parentElement?.textContent).toBe("CSE 11 and MATH 20A overlap");
+    expect(within(midterms).getAllByText("Tue, Oct 27, 2026")).toHaveLength(1);
+    expect(within(midterms).getAllByRole("cell", { name: "CENTR 101" })).toHaveLength(4);
+    expect(within(screen.getByRole("table", { name: "Finals" })).getAllByRole("cell", { name: "TBA" })).toHaveLength(4);
+    expect(screen.getByText("CSE 11 and MATH 20A overlap")).toBeVisible();
+    expect(screen.getByText("Tue, Oct 27, 2026 · 8:00 PM – 9:00 PM")).toBeVisible();
     expect(screen.getAllByLabelText("Exam time conflict")).toHaveLength(2);
     const ids = within(midterms).getAllByRole("cell").map((cell) => cell.getAttribute("aria-describedby")).filter(Boolean);
     expect(ids).toHaveLength(2);
     for (const id of ids) expect(document.getElementById(id!)).toHaveTextContent("CSE 11 and MATH 20A overlap");
-    const rows = within(midterms).getAllByRole("row");
-    expect(rows[3]).toHaveTextContent("MATH 20A");
-    expect(rows[4]).toContainElement(notice);
-    expect(rows[5]).toHaveTextContent("ECON 1");
   });
   it("retains exam data after refresh and clears conflicts when a course is removed", async () => {
     const first = mount();
@@ -51,17 +51,26 @@ describe("exam tab", () => {
     first.unmount();
     render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
     fireEvent.click(screen.getAllByRole("button", { name: "Remove CSE 11: Course" })[0]);
-    expect(screen.queryByText("1 conflict")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Exams.*conflict/ })).not.toBeInTheDocument();
     openExams();
     expect(screen.queryByText("CSE 11: Course")).not.toBeInTheDocument();
     expect(screen.queryByText(/and MATH 20A overlap/)).not.toBeInTheDocument();
-    expect(screen.getByText("3 courses")).toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "Midterms" })).getAllByText("CENTR 101")).toHaveLength(3);
   });
   it("explains missing saved metadata without inventing exams", () => {
     mount([{ ...courses[0], exams: undefined }]);
     openExams();
-    expect(screen.getByText(/Remove and re-add these courses/)).toBeInTheDocument();
-    expect(screen.getByText("No final details available.")).toBeInTheDocument();
+    expect(screen.getByText(/re-add these courses/)).toBeInTheDocument();
+    expect(screen.queryByText(/No midterms listed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Finals" })).toBeNull();
+  });
+  it("keeps Midterms visible for a schedule with only a final", () => {
+    mount([{ ...courses[0], exams: courses[0].exams!.filter((exam) => exam.type === "final") }]);
+    openExams();
+    const midterms = within(screen.getByRole("region", { name: "Midterms" }));
+    expect(midterms.getByText("No midterms listed for CSE 11.")).toBeVisible();
+    expect(midterms.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("table", { name: "Finals" })).toBeVisible();
   });
   it("shows an empty schedule state", () => {
     mount([]);
@@ -72,17 +81,23 @@ describe("exam tab", () => {
 
 describe("schedule compatibility", () => {
   beforeEach(() => localStorage.clear());
-  it("places a cross-type notice once after the final and counts distinct pairs", () => {
+  it("lists each cross-type conflict once and associates it with both exams", () => {
     const overlapping = courses.slice(0, 3).map((course, index) => ({
       ...course,
       exams: [{ ...course.exams![0], type: index === 0 ? "final" as const : "midterm" as const, time: "2026-12-07 8:00am-11:00am" }],
     }));
     mount(overlapping);
-    expect(screen.getByText("3 conflicts")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Exams 3 conflicts/ })).toBeInTheDocument();
     openExams();
-    const finals = screen.getByRole("table", { name: "Finals" });
-    expect(within(finals).getAllByText(/ overlap$/)).toHaveLength(2);
-    expect(within(screen.getByRole("table", { name: "Midterms" })).getAllByText(/ overlap$/)).toHaveLength(1);
+    expandConflicts();
+    expect(screen.getAllByText(/ overlap$/)).toHaveLength(3);
+    for (const table of screen.getAllByRole("table")) {
+      for (const marker of within(table).getAllByLabelText("Exam time conflict")) {
+        const ids = marker.closest("td")?.getAttribute("aria-describedby")?.split(" ") ?? [];
+        expect(ids).toHaveLength(2);
+        for (const id of ids) expect(document.getElementById(id)).toHaveTextContent(/overlap/);
+      }
+    }
   });
   it("keeps personal events editable and out of the exam list", () => {
     mount([

@@ -7,7 +7,11 @@ export interface CalendarEvent {
   color: string;
   isCourse?: boolean;
   courseId?: string;
+  courseKey?: string;
+  term?: string;
   eventType?: string;
+  sectionCode?: string;
+  instructor?: string;
   location?: string;
   /** Original course label, shared by lecture and section events. */
   courseTitle?: string;
@@ -26,12 +30,13 @@ export interface CalendarExam {
 /** A selected course with published exams but no usable recurring meetings. */
 export interface CalendarCourse {
   id: string;
+  term?: string;
   title: string;
   color: string;
   exams: CalendarExam[];
 }
 
-export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri";
+export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
 
 export type EventColor = {
   label: string;
