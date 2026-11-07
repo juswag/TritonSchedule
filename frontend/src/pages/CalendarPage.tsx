@@ -20,11 +20,10 @@ import {
 } from "@/lib/savedSchedules";
 import { hasScheduleConflict } from "@/lib/scheduleConflicts";
 import "@/components/schedule/savedSchedules.css";
-import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   CalendarPlus,
-  Plus,
+  Eraser,
   Search,
   Check,
   ChevronLeft,
@@ -112,19 +111,27 @@ export default function CalendarPage() {
     deleteEvent,
     deleteEventsByCourseId,
     replaceCourseEvents,
-    undoCourseReplacement,
-    canUndoCourseReplacement,
+    clearSchedule,
+    undoScheduleChange,
+    canUndoScheduleChange,
   } = useCalendar();
   const [activeTab, setActiveTab] = useState("weekly");
   const initialEvents = useRef(events);
   const [term, setTerm] = useState("");
+  const termEvents = useMemo(
+    () => events.filter((event) => !term || !event.term || event.term === term),
+    [events, term],
+  );
+  const termExamCourses = examOnlyCourses.filter(
+    (course) => !term || !course.term || course.term === term,
+  );
+  const [searchReset, setSearchReset] = useState(0);
   const [termAttempt, setTermAttempt] = useState(0);
   const [termError, setTermError] = useState("");
   const [selected, setSelected] = useState<ScheduleCourse[]>([]);
   const library = useScheduleLibrary(term);
   const [savedPreviewId, setSavedPreviewId] = useState<string | null>(null);
   const [saveDraft, setSaveDraft] = useState<PlanSnapshot | null>(null);
-  const previousSelection = useRef<ScheduleCourse[] | null>(null);
   const current = useMemo(
     () =>
       currentSnapshot(
@@ -329,7 +336,7 @@ export default function CalendarPage() {
   const shown = sorted[index];
   useLayoutMotion(
     coursesRef,
-    `${selected.map((course) => course.key).join(",")}:${coursesExpanded}:${previewing}:${notice}:${canUndoCourseReplacement}`,
+    `${selected.map((course) => course.key).join(",")}:${coursesExpanded}:${previewing}:${notice}:${canUndoScheduleChange}`,
   );
   useEffect(() => {
     if (shown && activeScheduleId === null) setActiveScheduleId(shown.id);
@@ -369,8 +376,8 @@ export default function CalendarPage() {
     focusResults();
   }
   const previewEvents = shown
-    ? [...events.filter((e) => !e.isCourse), ...shown.events]
-    : events;
+    ? [...termEvents.filter((e) => !e.isCourse), ...shown.events]
+    : termEvents;
 
   const colors = useMemo(
     () =>
@@ -405,14 +412,14 @@ export default function CalendarPage() {
     return () => window.clearTimeout(timer);
   }, [shown, previewing]);
   const rangeEvents = useMemo(() => {
-    if (!previewing || !schedules.length) return events;
+    if (!previewing || !schedules.length) return termEvents;
     const meetings = new Map(
-      events.filter((e) => !e.isCourse).map((e) => [e.id, e]),
+      termEvents.filter((e) => !e.isCourse).map((e) => [e.id, e]),
     );
     for (const schedule of schedules)
       for (const event of schedule.events) meetings.set(event.id, event);
     return [...meetings.values()];
-  }, [previewing, schedules, events]);
+  }, [previewing, schedules, termEvents]);
 
   function closeSavedPreview() {
     setSavedPreviewId(null);
@@ -464,7 +471,7 @@ export default function CalendarPage() {
   async function applySavedPlan() {
     if (!savedPreview || applying) return;
     const plan = savedPreview;
-    const blocked = events.filter((e) => !e.isCourse);
+    const blocked = termEvents.filter((e) => !e.isCourse);
     if (hasScheduleConflict(plan.events, blocked)) {
       setError(
         "A personal event overlaps this schedule. Move the event or choose another schedule.",
@@ -495,11 +502,13 @@ export default function CalendarPage() {
         validateSavedPlan(plan, latest);
       }
       if (!library.update((s) => ({ ...s, preferredId: plan.id }))) return;
-      previousSelection.current = selected;
-      replaceCourseEvents([
-        ...events.filter((e) => e.isCourse && e.term && e.term !== term),
-        ...plan.events,
-      ]);
+      replaceCourseEvents(
+        [
+          ...events.filter((e) => e.isCourse && e.term && e.term !== term),
+          ...plan.events,
+        ],
+        selected,
+      );
       setSelected(visibleCourses);
       setSourceSignature("");
       closeSavedPreview();
@@ -535,6 +544,24 @@ export default function CalendarPage() {
     runId.current++;
     setPhase("stopped");
   }
+  function clearWorkingSchedule() {
+    stop();
+    clearSchedule(term, selected);
+    closeSavedPreview();
+    setSelected([]);
+    setSchedules([]);
+    setActiveScheduleId(null);
+    setSourceSignature("");
+    setSourceCourses([]);
+    setIssues([]);
+    setPhase("idle");
+    setPreviewing(false);
+    setNotice("Schedule cleared.");
+    setSearchReset((value) => value + 1);
+    setActiveTab("weekly");
+    editCourses();
+  }
+
   async function generate() {
     if (!visibleCourses.length || !term) return;
     const generationCourses = visibleCourses;
@@ -635,7 +662,7 @@ export default function CalendarPage() {
       nextWorker.postMessage({
         type: "start",
         courses,
-        blockedEvents: events.filter((e) => !e.isCourse),
+        blockedEvents: termEvents.filter((e) => !e.isCourse),
       });
     } catch (err) {
       if (controller.signal.aborted || id !== runId.current) return;
@@ -667,7 +694,6 @@ export default function CalendarPage() {
       )
         return;
       validateOptions(captureOptions(shown.choices, sourceCourses), latest);
-      previousSelection.current = null;
       const keptEvents = [
         ...events.filter((e) => e.isCourse && e.term && e.term !== term),
         ...paintEvents(shown.events),
@@ -707,14 +733,14 @@ export default function CalendarPage() {
   }
 
   const displayedEvents = savedPreview
-    ? [...events.filter((event) => !event.isCourse), ...savedPreview.events]
+    ? [...termEvents.filter((event) => !event.isCourse), ...savedPreview.events]
     : previewing && shown
       ? previewEvents
-      : events;
-  const examSchedule = getExamSchedule(displayedEvents, examOnlyCourses);
+      : termEvents;
+  const examSchedule = getExamSchedule(displayedEvents, termExamCourses);
   const courseCount = new Set([
     ...displayedEvents.filter((e) => e.isCourse).map((e) => e.courseId || e.id),
-    ...examOnlyCourses.map((course) => course.id),
+    ...termExamCourses.map((course) => course.id),
   ]).size;
 
   return (
@@ -762,6 +788,7 @@ export default function CalendarPage() {
             </div>
             <div className="shrink-0">
               <CourseQuickSearch
+                key={searchReset}
                 term={term}
                 selectedKeys={visibleCourses.map((c) => c.key)}
                 onAdd={(course) => changeCourses([...visibleCourses, course])}
@@ -849,13 +876,23 @@ export default function CalendarPage() {
                   Up to 12 courses per search.
                 </p>
               )}
-              <Link
-                to="/courses"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-primary/25 bg-card px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              <button
+                type="button"
+                onClick={clearWorkingSchedule}
+                disabled={
+                  applying ||
+                  !term ||
+                  !(
+                    visibleCourses.length ||
+                    termEvents.length ||
+                    termExamCourses.length
+                  )
+                }
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-primary/25 bg-card px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:opacity-50"
               >
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                Add a course
-              </Link>
+                <Eraser aria-hidden="true" className="h-4 w-4" />
+                Clear Schedule
+              </button>
               <button
                 type="button"
                 onClick={generate}
@@ -877,30 +914,28 @@ export default function CalendarPage() {
           </div>
           {!savedPreview &&
             !previewing &&
-            (notice || canUndoCourseReplacement) && (
+            (notice || canUndoScheduleChange) && (
               <div
                 data-motion-key="schedule-feedback"
                 className="mt-3 space-y-2"
               >
-                {(notice || canUndoCourseReplacement) && (
+                {(notice || canUndoScheduleChange) && (
                   <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <p
                       role="status"
                       key={notice}
                       className="schedule-feedback min-w-0 flex-1 text-muted-foreground"
                     >
-                      {notice || "Schedule applied."}
+                      {notice}
                     </p>
-                    {canUndoCourseReplacement && (
+                    {canUndoScheduleChange && (
                       <button
                         type="button"
-                        disabled={applying}
+                        disabled={applying || !term}
                         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-40"
                         onClick={() => {
-                          undoCourseReplacement();
-                          if (previousSelection.current)
-                            setSelected(previousSelection.current);
-                          previousSelection.current = null;
+                          const previousSelection = undoScheduleChange();
+                          if (previousSelection) setSelected(previousSelection);
                           setPreviewing(false);
                           setNotice("Previous schedule restored.");
                         }}
@@ -1288,7 +1323,7 @@ export default function CalendarPage() {
               <ExamSchedule
                 {...examSchedule}
                 courseCount={courseCount}
-                examOnlyCourses={examOnlyCourses}
+                examOnlyCourses={termExamCourses}
                 onRemoveCourse={deleteEventsByCourseId}
               />
             </TabsContent>

@@ -28,6 +28,7 @@ export interface CalendarExam {
 /** A selected course with published exams but no usable recurring meetings. */
 export interface CalendarCourse {
   id: string;
+  term?: string;
   title: string;
   color: string;
   exams: CalendarExam[];

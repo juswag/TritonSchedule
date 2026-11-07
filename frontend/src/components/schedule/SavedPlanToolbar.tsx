@@ -4,11 +4,9 @@ import type { SavedPlan } from "@/lib/savedSchedules";
 export function SavePlanButton({
   onClick,
   disabled,
-  copy,
 }: {
   onClick: () => void;
   disabled: boolean;
-  copy?: boolean;
 }) {
   return (
     <button
@@ -18,7 +16,7 @@ export function SavePlanButton({
       onClick={onClick}
     >
       <Bookmark size={15} />
-      {copy ? "Save a copy" : "Save schedule"}
+      Save Schedule
     </button>
   );
 }
@@ -79,7 +77,7 @@ export function SavedPlanToolbar({
           {applying ? "Applying…" : "Use schedule"}
         </button>
       ) : (
-        <SavePlanButton copy disabled={!canSave} onClick={onSave} />
+        <SavePlanButton disabled={!canSave} onClick={onSave} />
       )}
     </div>
   );

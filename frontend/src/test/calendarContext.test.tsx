@@ -197,13 +197,13 @@ describe("CalendarContext", () => {
       personal,
       replacement,
     ]);
-    expect(result.current.canUndoCourseReplacement).toBe(true);
+    expect(result.current.canUndoScheduleChange).toBe(true);
     const laterPersonal = { ...personal, id: "later" };
     act(() => result.current.addEvent(laterPersonal));
-    act(() => result.current.undoCourseReplacement());
+    act(() => result.current.undoScheduleChange());
     expect(result.current.events).toEqual([personal, laterPersonal, oldCourse]);
-    expect(result.current.canUndoCourseReplacement).toBe(false);
-    act(() => result.current.undoCourseReplacement());
+    expect(result.current.canUndoScheduleChange).toBe(false);
+    act(() => result.current.undoScheduleChange());
     expect(result.current.events).toHaveLength(3);
   });
 
@@ -222,7 +222,7 @@ describe("CalendarContext", () => {
     });
     act(() => result.current.replaceCourseEvents([course]));
     act(() => result.current.updateEvent("new", { startTime: "10:00" }));
-    expect(result.current.canUndoCourseReplacement).toBe(false);
+    expect(result.current.canUndoScheduleChange).toBe(false);
   });
 
   it("should throw error when useCalendar is used outside provider", () => {

@@ -426,11 +426,82 @@ describe("schedule page generation", () => {
     return screen.findByRole("button", { name: "Preview " + name });
   }
 
+  it("clears the working term during generation, keeps saved plans, and can undo", async () => {
+    const older = { ...oldCourse, id: "older", term: "SP26" };
+    mountPage({ events: [...saved, older] });
+    await ready();
+    await namePlan("Save Schedule", "Original");
+    const worker = await generate();
+    const previousDraft = localStorage.getItem(selectionsKey);
+    const search = screen.getByRole("combobox", {
+      name: "Quick course search",
+    });
+    fireEvent.change(search, { target: { value: "MATH" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear Schedule" }));
+    act(() => {
+      worker.flush();
+    });
+    expect(worker.terminate).toHaveBeenCalled();
+    expect(storedEvents()).toEqual([older]);
+    expect(JSON.parse(localStorage.getItem(selectionsKey)!)).toEqual([]);
+    expect(
+      screen.getByRole("button", { name: "Preview Original" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Generate schedules" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Clear Schedule" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Save Schedule" }),
+    ).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveFocus());
+    expect(screen.getByRole("combobox")).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(storedEvents()).toEqual(expect.arrayContaining([...saved, older]));
+    expect(storedEvents()).toHaveLength(3);
+    expect(localStorage.getItem(selectionsKey)).toBe(previousDraft);
+    expect(
+      screen.getByRole("button", { name: "Remove CSE 101" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Generate schedules" }),
+    ).toBeEnabled();
+  });
+
+  it("clears and restores exam-only courses, including legacy records", async () => {
+    const examCourse = {
+      id: "exam-only",
+      title: "CSE 100",
+      color: "#aaa",
+      exams: [],
+    };
+    const earlier = { ...examCourse, id: "previous-term", term: "SP26" };
+    localStorage.setItem(
+      "calendarExamOnlyCourses",
+      JSON.stringify([earlier, examCourse]),
+    );
+    mountPage({ events: [], courses: [] });
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Clear Schedule" }));
+    expect(
+      JSON.parse(localStorage.getItem("calendarExamOnlyCourses")!),
+    ).toEqual([earlier]);
+    expect(
+      screen.getByRole("button", { name: "Clear Schedule" }),
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(
+      JSON.parse(localStorage.getItem("calendarExamOnlyCourses")!),
+    ).toEqual([earlier, examCourse]);
+  });
+
   it("saves only the displayed course meetings, independently of the generation draft and other terms", async () => {
     const older = { ...oldCourse, id: "another-term", term: "SP26" };
     mountPage({ events: [...saved, older] });
     await ready();
-    const card = await namePlan("Save a copy", "Original");
+    const card = await namePlan("Save Schedule", "Original");
     expect(card).toHaveAccessibleDescription("CSE 101");
     const library = JSON.parse(
       localStorage.getItem("savedSchedules:v1:" + TERM)!,
@@ -461,7 +532,7 @@ describe("schedule page generation", () => {
     act(() => {
       worker.flush();
     });
-    await namePlan("Save schedule", "Two courses");
+    await namePlan("Save Schedule", "Two courses");
     expect(storedEvents()).toEqual([...saved, older]);
     fireEvent.click(
       screen.getByRole("button", { name: "Back to current schedule" }),
@@ -503,7 +574,7 @@ describe("schedule page generation", () => {
     act(() => {
       worker.flush();
     });
-    await namePlan("Save schedule", "Finals plan");
+    await namePlan("Save Schedule", "Finals plan");
     cleanup();
     mountPage({ seed: false });
     await ready();
@@ -533,7 +604,7 @@ describe("schedule page generation", () => {
     act(() => {
       worker.flush();
     });
-    await namePlan("Save schedule", "Candidate");
+    await namePlan("Save Schedule", "Candidate");
     vi.mocked(getScheduleOptions).mockResolvedValueOnce([
       { ...cse, options: [] },
       math,
@@ -564,7 +635,7 @@ describe("schedule page generation", () => {
   it("does not show a saved card when browser storage rejects a write", async () => {
     mountPage();
     await ready();
-    fireEvent.click(screen.getByRole("button", { name: "Save a copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Schedule" }));
     const storage = vi
       .spyOn(Storage.prototype, "setItem")
       .mockImplementation(() => {

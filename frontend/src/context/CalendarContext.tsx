@@ -6,6 +6,16 @@ import React, {
   ReactNode,
 } from "react";
 import { CalendarCourse, CalendarEvent } from "@/types/calendar";
+import type { ScheduleCourse } from "@/types/generation";
+
+type ScheduleUndo =
+  | { kind: "replace"; courses: CalendarEvent[]; selection?: ScheduleCourse[] }
+  | {
+      kind: "clear";
+      selection: ScheduleCourse[];
+      events: CalendarEvent[];
+      examOnlyCourses: CalendarCourse[];
+    };
 
 interface CalendarContextType {
   events: CalendarEvent[];
@@ -15,9 +25,13 @@ interface CalendarContextType {
   updateEvent: (id: string, event: Partial<CalendarEvent>) => void;
   deleteEvent: (id: string) => void;
   deleteEventsByCourseId: (courseId: string) => void;
-  replaceCourseEvents: (courses: CalendarEvent[]) => void;
-  undoCourseReplacement: () => void;
-  canUndoCourseReplacement: boolean;
+  replaceCourseEvents: (
+    courses: CalendarEvent[],
+    selection?: ScheduleCourse[],
+  ) => void;
+  clearSchedule: (term: string, selection: ScheduleCourse[]) => void;
+  undoScheduleChange: () => ScheduleCourse[] | undefined;
+  canUndoScheduleChange: boolean;
 }
 
 const CalendarContext = createContext<CalendarContextType | undefined>(
@@ -83,9 +97,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   );
   const [examOnlyCourses, setExamOnlyCourses] =
     useState<CalendarCourse[]>(loadExamOnlyCourses);
-  const [previousCourses, setPreviousCourses] = useState<
-    CalendarEvent[] | null
-  >(null);
+  const [undo, setUndo] = useState<ScheduleUndo | null>(null);
 
   useEffect(() => {
     try {
@@ -106,6 +118,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   }, [examOnlyCourses]);
 
   const addExamOnlyCourse = (course: CalendarCourse) => {
+    setUndo((previous) => (previous?.kind === "clear" ? null : previous));
     setExamOnlyCourses((previous) => [
       ...previous.filter((item) => item.id !== course.id),
       course,
@@ -113,12 +126,12 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   };
 
   const addEvent = (event: CalendarEvent) => {
-    if (event.isCourse) setPreviousCourses(null);
+    if (event.isCourse) setUndo(null);
     setEvents((prev) => [...prev, event]);
   };
 
   const updateEvent = (id: string, updatedFields: Partial<CalendarEvent>) => {
-    setPreviousCourses(null);
+    setUndo(null);
     setEvents((prev) =>
       prev.map((event) =>
         event.id === id ? { ...event, ...updatedFields } : event,
@@ -127,33 +140,61 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteEvent = (id: string) => {
-    setPreviousCourses(null);
+    setUndo(null);
     setEvents((prev) => prev.filter((event) => event.id !== id));
   };
 
   const deleteEventsByCourseId = (courseId: string) => {
-    setPreviousCourses(null);
+    setUndo(null);
     setEvents((prev) => prev.filter((event) => event.courseId !== courseId));
     setExamOnlyCourses((prev) =>
       prev.filter((course) => course.id !== courseId),
     );
   };
 
-  const replaceCourseEvents = (courses: CalendarEvent[]) => {
-    setPreviousCourses(events.filter((event) => event.isCourse));
+  const replaceCourseEvents = (
+    courses: CalendarEvent[],
+    selection?: ScheduleCourse[],
+  ) => {
+    setUndo({
+      kind: "replace",
+      selection,
+      courses: events.filter((event) => event.isCourse),
+    });
     setEvents((current) => [
       ...current.filter((event) => !event.isCourse),
       ...courses,
     ]);
   };
 
-  const undoCourseReplacement = () => {
-    if (previousCourses === null) return;
-    setEvents((current) => [
-      ...current.filter((event) => !event.isCourse),
-      ...previousCourses,
-    ]);
-    setPreviousCourses(null);
+  const clearSchedule = (term: string, selection: ScheduleCourse[]) => {
+    const inTerm = (item: { term?: string }) =>
+      !item.term || item.term === term;
+    setUndo({
+      kind: "clear",
+      selection,
+      events: events.filter(inTerm),
+      examOnlyCourses: examOnlyCourses.filter(inTerm),
+    });
+    setEvents((current) => current.filter((event) => !inTerm(event)));
+    setExamOnlyCourses((current) =>
+      current.filter((course) => !inTerm(course)),
+    );
+  };
+
+  const undoScheduleChange = () => {
+    if (!undo) return;
+    if (undo.kind === "clear") {
+      setEvents((current) => [...current, ...undo.events]);
+      setExamOnlyCourses((current) => [...current, ...undo.examOnlyCourses]);
+    } else {
+      setEvents((current) => [
+        ...current.filter((event) => !event.isCourse),
+        ...undo.courses,
+      ]);
+    }
+    setUndo(null);
+    return undo.selection;
   };
 
   return (
@@ -167,8 +208,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         deleteEvent,
         deleteEventsByCourseId,
         replaceCourseEvents,
-        undoCourseReplacement,
-        canUndoCourseReplacement: previousCourses !== null,
+        clearSchedule,
+        undoScheduleChange,
+        canUndoScheduleChange: undo !== null,
       }}
     >
       {children}
