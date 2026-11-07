@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "meeting-jiggle",
+        "files": [
+          "frontend/src/index.css"
+        ],
+        "createdAt": "2026-11-07T05:02:27.797Z",
+        "reason": "User requested a brief hover jiggle to indicate that schedule cards open meeting details."
+      }
+    ]
+  }
+}
