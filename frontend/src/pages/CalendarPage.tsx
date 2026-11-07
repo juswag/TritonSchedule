@@ -911,7 +911,10 @@ export default function CalendarPage() {
                 className={`mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50 ${previewing ? "border border-border bg-card text-primary hover:bg-primary/5" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
               >
                 {busy ? (
-                  <Loader2 className="h-4 w-4 motion-safe:animate-spin" />
+                  <span
+                    aria-hidden="true"
+                    className="schedule-generation-ring size-4 border-2 motion-safe:animate-spin"
+                  />
                 ) : (
                   <CalendarPlus className="h-4 w-4" />
                 )}
@@ -1041,22 +1044,15 @@ export default function CalendarPage() {
                       </div>
                     )}
                     {busy && (
-                      <div
-                        className="mb-3 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4"
-                        role="status"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Loader2
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 py-2">
+                        <div role="status" className="flex items-center gap-3 text-sm font-medium">
+                          <span
                             aria-hidden="true"
-                            className="h-5 w-5 shrink-0 text-primary motion-safe:animate-spin"
+                            className="schedule-generation-ring size-8 border-[3px] text-primary motion-safe:animate-spin"
                           />
-                          <div>
-                            <h2 className="text-base font-semibold">
-                              {phase === "loading"
-                                ? "Loading course options…"
-                                : "Finding schedules…"}
-                            </h2>
-                          </div>
+                          {phase === "loading"
+                            ? "Loading course options…"
+                            : "Finding schedules…"}
                         </div>
                         <button
                           type="button"

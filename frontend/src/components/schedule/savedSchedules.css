@@ -1,3 +1,12 @@
+.schedule-generation-ring {
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: color-mix(in srgb, currentColor 22%, transparent);
+  border-top-color: currentColor;
+}
+
 .plan-shelf {
   margin-top: 24px;
   padding-top: 16px;
