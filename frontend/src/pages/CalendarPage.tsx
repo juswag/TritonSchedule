@@ -33,7 +33,6 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
-  Search,
   Undo2,
   ArrowDownWideNarrow,
   X,
@@ -547,9 +546,8 @@ export default function CalendarPage() {
     runId.current++;
     setPhase("stopped");
   }
-  function clearWorkingSchedule() {
+  function resetCourseSelection() {
     stop();
-    clearSchedule(term, selected);
     closeSavedPreview();
     setSelected([]);
     setSchedules([]);
@@ -558,16 +556,37 @@ export default function CalendarPage() {
     setSourceCourses([]);
     setPhase("idle");
     setPreviewing(false);
-    setNotice("Schedule cleared.");
     setSearchReset((value) => value + 1);
-    setActiveTab("weekly");
     editCourses();
   }
 
-  async function generate() {
-    if (!visibleCourses.length || !term) return;
-    const generationCourses = visibleCourses;
-    if (viewedPlan) setSelected(generationCourses);
+  function clearWorkingSchedule() {
+    clearSchedule(term, selected);
+    resetCourseSelection();
+    setNotice("Schedule cleared.");
+    setActiveTab("weekly");
+  }
+
+  function removeCourse(key: string) {
+    const remaining = visibleCourses.filter((course) => course.key !== key);
+    if (remaining.length) {
+      void generatePreview(remaining, "removal");
+    } else {
+      resetCourseSelection();
+      setNotice("");
+    }
+  }
+
+  function generate() {
+    return generatePreview(visibleCourses, "manual");
+  }
+
+  async function generatePreview(
+    generationCourses: ScheduleCourse[],
+    trigger: "manual" | "removal",
+  ) {
+    if (!generationCourses.length || !term || applying) return;
+    setSelected(generationCourses);
     closeSavedPreview();
     stop();
     const id = ++runId.current;
@@ -586,9 +605,11 @@ export default function CalendarPage() {
     setActiveScheduleId(null);
     setSourceCourses([]);
     setPreviewing(true);
-    setCoursesExpanded(false);
     setHighlightedCourse(null);
-    focusResults();
+    if (trigger === "manual") {
+      setCoursesExpanded(false);
+      focusResults();
+    }
     try {
       let catalogCourses = generationCourses;
       if (generationCourses.some((c) => c.key === c.code)) {
@@ -612,6 +633,7 @@ export default function CalendarPage() {
         controller.signal,
       );
       if (
+        controller.signal.aborted ||
         id !== runId.current ||
         capturedSignature !== currentSignature.current
       )
@@ -782,14 +804,10 @@ export default function CalendarPage() {
       type="button"
       className="plan-button"
       disabled={applying || busy}
-      onClick={selected.length ? generate : editCourses}
+      onClick={generate}
     >
-      {selected.length ? (
-        <RefreshCw aria-hidden="true" size={16} />
-      ) : (
-        <Search aria-hidden="true" size={16} />
-      )}
-      {selected.length ? "Update preview" : "Find a course"}
+      <RefreshCw aria-hidden="true" size={16} />
+      Update preview
     </button>
   );
   const viewSwitcher = (
@@ -910,11 +928,7 @@ export default function CalendarPage() {
                     <button
                       type="button"
                       disabled={applying}
-                      onClick={() =>
-                        changeCourses(
-                          visibleCourses.filter((c) => c.key !== course.key),
-                        )
-                      }
+                      onClick={() => removeCourse(course.key)}
                       aria-label={`Remove ${course.code}`}
                       className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-destructive"
                     >

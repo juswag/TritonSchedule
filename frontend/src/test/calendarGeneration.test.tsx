@@ -702,7 +702,7 @@ describe("schedule page generation", () => {
     expect(storedEvents()).toEqual(saved);
   });
 
-  it("invalidates results after course removal and ignores queued worker messages", async () => {
+  it("regenerates after removal and ignores results from the previous worker", async () => {
     mountPage();
     const worker = await generate();
     let batch: GeneratedSchedule[] = [];
@@ -711,8 +711,7 @@ describe("schedule page generation", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Remove MATH 109" }));
     expect(worker.terminate).toHaveBeenCalled();
-    expect(screen.getByText("Preview out of date")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Update preview" })).toBeEnabled();
+    expect(getScheduleOptions).toHaveBeenLastCalledWith(TERM, [cse.key], expect.any(AbortSignal));
     expect(screen.queryByRole("button", { name: "Use schedule" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Find more schedules" }),
@@ -721,31 +720,53 @@ describe("schedule page generation", () => {
       worker.emit({ type: "results", schedules: batch, total: 2 });
       worker.emit({ type: "complete", total: 2 });
     });
-    expect(screen.getByText("1 schedule found")).toBeInTheDocument();
-    expect(
-      screen.getByText("Search stopped. Results may be incomplete."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("1 schedule found")).toBeNull();
     expect(storedEvents()).toEqual(saved);
     expect(JSON.parse(localStorage.getItem(selectionsKey)!)).toEqual([
       { key: cse.key, term: TERM, code: cse.code, title: cse.title },
     ]);
-    fireEvent.click(screen.getByRole("button", { name: "Update preview" }));
     await waitFor(() => expect(GeneratorWorker.instances).toHaveLength(2));
     act(() => { GeneratorWorker.instances[1].flush(); });
+    expect(screen.getByText("2 schedules found")).toBeInTheDocument();
+    expect(screen.queryByTitle(/^MATH 109: Proofs/)).toBeNull();
     expect(screen.queryByText("Preview out of date")).toBeNull();
     expect(screen.getByRole("button", { name: "Use schedule" })).toBeEnabled();
   });
 
-  it("opens course search from the outdated preview when the last course is removed", async () => {
-    mountPage({ courses: [cse] });
-    const worker = await generate();
-    act(() => { worker.flush(); });
-    fireEvent.click(screen.getByRole("button", { name: "Remove CSE 101" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find a course" }));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Quick course search" })).toHaveFocus());
-    expect(screen.queryByRole("button", { name: "Update preview" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Save Schedule" })).toBeDisabled();
+  it("uses only the latest selection when another course is removed while loading", async () => {
+    const third = { ...math, key: "phys-2a", code: "PHYS 2A" };
+    mountPage({ courses: [cse, math, third] });
+    await ready();
+    const pending = deferred<ScheduleCourse[]>();
+    vi.mocked(getScheduleOptions).mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Remove PHYS 2A" }));
+    const signal = vi.mocked(getScheduleOptions).mock.calls[0][2]!;
+    fireEvent.click(screen.getByRole("button", { name: "Remove MATH 109" }));
+    expect(signal.aborted).toBe(true);
+    await act(async () => pending.resolve([cse, math]));
     expect(GeneratorWorker.instances).toHaveLength(1);
+    expect(GeneratorWorker.instances[0].postMessage).toHaveBeenCalledWith({
+      type: "start", courses: [cse], blockedEvents: [personal],
+    });
+    expect(storedEvents()).toEqual(saved);
+  });
+
+  it("cancels generation and focuses course search when the last course is removed", async () => {
+    mountPage();
+    await ready();
+    const pending = deferred<ScheduleCourse[]>();
+    vi.mocked(getScheduleOptions).mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Remove MATH 109" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove CSE 101" }));
+    expect(vi.mocked(getScheduleOptions).mock.calls[0][2]!.aborted).toBe(true);
+    await act(async () => pending.resolve([cse]));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Quick course search" })).toHaveFocus());
+    expect(screen.getByText("0 selected")).toBeInTheDocument();
+    expect(screen.queryByText("Preview out of date")).toBeNull();
+    expect(screen.getByRole("button", { name: "Generate schedules" })).toBeDisabled();
+    expect(getScheduleOptions).toHaveBeenCalledTimes(1);
+    expect(GeneratorWorker.instances).toHaveLength(0);
+    expect(storedEvents()).toEqual(saved);
   });
 
   it("cancels an options request and ignores its late response", async () => {
