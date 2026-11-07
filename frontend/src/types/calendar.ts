@@ -7,6 +7,8 @@ export interface CalendarEvent {
   color: string;
   isCourse?: boolean;
   courseId?: string;
+  courseKey?: string;
+  term?: string;
   eventType?: string;
   location?: string;
   /** Original course label, shared by lecture and section events. */
@@ -31,7 +33,7 @@ export interface CalendarCourse {
   exams: CalendarExam[];
 }
 
-export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri";
+export type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
 
 export type EventColor = {
   label: string;

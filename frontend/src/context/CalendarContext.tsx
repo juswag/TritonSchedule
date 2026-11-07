@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 import { CalendarCourse, CalendarEvent } from "@/types/calendar";
 
 interface CalendarContextType {
@@ -9,19 +15,33 @@ interface CalendarContextType {
   updateEvent: (id: string, event: Partial<CalendarEvent>) => void;
   deleteEvent: (id: string) => void;
   deleteEventsByCourseId: (courseId: string) => void;
+  replaceCourseEvents: (courses: CalendarEvent[]) => void;
+  undoCourseReplacement: () => void;
+  canUndoCourseReplacement: boolean;
 }
 
-const CalendarContext = createContext<CalendarContextType | undefined>(undefined);
+const CalendarContext = createContext<CalendarContextType | undefined>(
+  undefined,
+);
 const CALENDAR_EVENTS_STORAGE_KEY = "calendarEvents";
+
 const EXAM_ONLY_COURSES_STORAGE_KEY = "calendarExamOnlyCourses";
 
 function loadExamOnlyCourses(): CalendarCourse[] {
   if (typeof window === "undefined") return [];
   try {
-    const stored: unknown = JSON.parse(window.localStorage.getItem(EXAM_ONLY_COURSES_STORAGE_KEY) ?? "[]");
+    const stored: unknown = JSON.parse(
+      window.localStorage.getItem(EXAM_ONLY_COURSES_STORAGE_KEY) ?? "[]",
+    );
     if (!Array.isArray(stored)) return [];
-    return stored.filter((course): course is CalendarCourse => course && typeof course.id === "string"
-      && typeof course.title === "string" && typeof course.color === "string" && Array.isArray(course.exams));
+    return stored.filter(
+      (course): course is CalendarCourse =>
+        course &&
+        typeof course.id === "string" &&
+        typeof course.title === "string" &&
+        typeof course.color === "string" &&
+        Array.isArray(course.exams),
+    );
   } catch {
     return [];
   }
@@ -32,12 +52,11 @@ function loadStoredEvents(): CalendarEvent[] {
     return [];
   }
 
-  const storedEvents = window.localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
-  if (!storedEvents) {
-    return [];
-  }
-
   try {
+    const storedEvents = window.localStorage.getItem(
+      CALENDAR_EVENTS_STORAGE_KEY,
+    );
+    if (!storedEvents) return [];
     const parsed = JSON.parse(storedEvents) as CalendarEvent[];
     if (!Array.isArray(parsed)) {
       return [];
@@ -59,45 +78,98 @@ function loadStoredEvents(): CalendarEvent[] {
 }
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
-  const [events, setEvents] = useState<CalendarEvent[]>(() => loadStoredEvents());
-  const [examOnlyCourses, setExamOnlyCourses] = useState<CalendarCourse[]>(loadExamOnlyCourses);
+  const [events, setEvents] = useState<CalendarEvent[]>(() =>
+    loadStoredEvents(),
+  );
+  const [examOnlyCourses, setExamOnlyCourses] =
+    useState<CalendarCourse[]>(loadExamOnlyCourses);
+  const [previousCourses, setPreviousCourses] = useState<
+    CalendarEvent[] | null
+  >(null);
 
   useEffect(() => {
-    window.localStorage.setItem(CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify(events));
+    try {
+      window.localStorage.setItem(
+        CALENDAR_EVENTS_STORAGE_KEY,
+        JSON.stringify(events),
+      );
+    } catch {
+      /* Keep the current session usable when browser storage is unavailable. */
+    }
   }, [events]);
 
   useEffect(() => {
-    window.localStorage.setItem(EXAM_ONLY_COURSES_STORAGE_KEY, JSON.stringify(examOnlyCourses));
+    window.localStorage.setItem(
+      EXAM_ONLY_COURSES_STORAGE_KEY,
+      JSON.stringify(examOnlyCourses),
+    );
   }, [examOnlyCourses]);
 
   const addExamOnlyCourse = (course: CalendarCourse) => {
-    setExamOnlyCourses((previous) => [...previous.filter((item) => item.id !== course.id), course]);
+    setExamOnlyCourses((previous) => [
+      ...previous.filter((item) => item.id !== course.id),
+      course,
+    ]);
   };
 
   const addEvent = (event: CalendarEvent) => {
+    if (event.isCourse) setPreviousCourses(null);
     setEvents((prev) => [...prev, event]);
   };
 
   const updateEvent = (id: string, updatedFields: Partial<CalendarEvent>) => {
+    setPreviousCourses(null);
     setEvents((prev) =>
       prev.map((event) =>
-        event.id === id ? { ...event, ...updatedFields } : event
-      )
+        event.id === id ? { ...event, ...updatedFields } : event,
+      ),
     );
   };
 
   const deleteEvent = (id: string) => {
+    setPreviousCourses(null);
     setEvents((prev) => prev.filter((event) => event.id !== id));
   };
 
   const deleteEventsByCourseId = (courseId: string) => {
+    setPreviousCourses(null);
     setEvents((prev) => prev.filter((event) => event.courseId !== courseId));
-    setExamOnlyCourses((prev) => prev.filter((course) => course.id !== courseId));
+    setExamOnlyCourses((prev) =>
+      prev.filter((course) => course.id !== courseId),
+    );
+  };
+
+  const replaceCourseEvents = (courses: CalendarEvent[]) => {
+    setPreviousCourses(events.filter((event) => event.isCourse));
+    setEvents((current) => [
+      ...current.filter((event) => !event.isCourse),
+      ...courses,
+    ]);
+  };
+
+  const undoCourseReplacement = () => {
+    if (previousCourses === null) return;
+    setEvents((current) => [
+      ...current.filter((event) => !event.isCourse),
+      ...previousCourses,
+    ]);
+    setPreviousCourses(null);
   };
 
   return (
     <CalendarContext.Provider
-      value={{ events, examOnlyCourses, addExamOnlyCourse, addEvent, updateEvent, deleteEvent, deleteEventsByCourseId }}
+      value={{
+        events,
+        examOnlyCourses,
+        addExamOnlyCourse,
+        addEvent,
+        updateEvent,
+        deleteEvent,
+        deleteEventsByCourseId,
+        replaceCourseEvents,
+        undoCourseReplacement,
+        canUndoCourseReplacement: previousCourses !== null,
+      }}
     >
       {children}
     </CalendarContext.Provider>

@@ -334,7 +334,7 @@ export function buildLegacySections(
   });
 }
 
-function toLegacyMeeting(meeting: ClassPlannerMeeting): Section {
+export function toLegacyMeeting(meeting: ClassPlannerMeeting): Section {
   return {
     Days: meeting.specific_date ?? meeting.day_name ?? meeting.day_code ?? "TBA",
     Time: displayTime(meeting),

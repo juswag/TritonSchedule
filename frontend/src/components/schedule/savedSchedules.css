@@ -1,0 +1,275 @@
+.plan-shelf {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid hsl(var(--border));
+  min-width: 0;
+}
+.plan-list {
+  display: flex;
+  gap: 5px;
+  margin-inline: -8px;
+  padding: 3px;
+}
+.plan-card {
+  position: relative;
+  min-width: 0;
+  border-radius: 8px;
+}
+.plan-card[data-viewing="true"] {
+  background: hsl(var(--primary) / 0.065);
+}
+.plan-card:hover {
+  background: hsl(var(--muted));
+}
+.plan-pick {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  border-radius: inherit;
+}
+.plan-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 28px;
+  min-height: 24px;
+}
+.plan-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+}
+.plan-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  white-space: nowrap;
+}
+.plan-title .plan-marker {
+  margin-left: auto;
+}
+.plan-courses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 3px 0 10px;
+}
+.plan-courses span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.plan-courses i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.plan-mini {
+  width: 100%;
+  display: block;
+  background: hsl(var(--card));
+  border-radius: 5px;
+}
+.plan-mini text {
+  font-family: inherit;
+  font-size: 9px;
+  fill: hsl(var(--muted-foreground));
+}
+.plan-mini line {
+  stroke: hsl(var(--border) / 0.6);
+  stroke-width: 0.8;
+}
+.plan-icon,
+.plan-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+.plan-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+.plan-more {
+  position: absolute;
+  right: 4px;
+  top: 8px;
+  color: hsl(var(--muted-foreground));
+}
+.plan-button {
+  min-height: 44px;
+  gap: 8px;
+  padding: 7px 13px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+}
+.plan-button.quiet {
+  background: transparent;
+  border-color: transparent;
+}
+.plan-button.primary {
+  background: hsl(var(--primary));
+  border-color: transparent;
+  color: hsl(var(--primary-foreground));
+}
+.plan-icon:hover,
+.plan-button:not(.primary):hover {
+  background: hsl(var(--muted));
+}
+.plan-button.primary:hover {
+  background: hsl(var(--primary) / 0.92);
+}
+:is(.plan-button, .plan-icon, .plan-pick):focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 1px;
+}
+:is(.plan-button, .plan-icon):disabled {
+  opacity: 0.45;
+}
+.plan-form {
+  margin: 5px 0;
+  padding: 8px;
+}
+.plan-form input {
+  display: block;
+  width: 100%;
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 5px;
+  font-size: 14px;
+  background: hsl(var(--card));
+}
+.plan-form .plan-button {
+  min-height: 32px;
+}
+.plan-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .plan-card {
+    transition: background-color 160ms ease;
+  }
+}
+@media (max-width: 639px) {
+  #schedule-course-controls ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
+  }
+  #schedule-course-controls ul > li {
+    border: 0;
+  }
+}
+@media (min-width: 1024px) {
+  .plan-workspace {
+    height: calc(100dvh - 112px);
+    min-height: 320px;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .plan-sidebar,
+  .plan-shelf {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .plan-sidebar {
+    overflow-y: auto;
+  }
+  .plan-sidebar > :not(.plan-shelf),
+  .plan-shelf > :not(.plan-list) {
+    flex: none;
+  }
+  .plan-shelf {
+    flex: 1 1 0;
+    min-height: 120px;
+  }
+  .plan-list {
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #bcc7d4 transparent;
+  }
+  .plan-card {
+    flex: none;
+  }
+  .plan-calendar {
+    overflow-y: auto;
+  }
+  @supports selector(::-webkit-scrollbar) {
+    .plan-list {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+    .plan-list::-webkit-scrollbar {
+      width: 14px;
+    }
+    .plan-list::-webkit-scrollbar-track {
+      background: transparent;
+      margin-block: 8px;
+    }
+    .plan-list::-webkit-scrollbar-thumb {
+      min-height: 32px;
+      border: solid transparent;
+      border-width: 0 6px;
+      border-radius: 999px;
+      background: #bcc7d4 padding-box;
+    }
+    .plan-list:is(:hover, :focus-within)::-webkit-scrollbar-thumb {
+      border-inline-width: 5px;
+      background-color: #98a7b9;
+    }
+    .plan-list::-webkit-scrollbar-thumb:hover,
+    .plan-list::-webkit-scrollbar-thumb:active {
+      border-inline-width: 4px;
+      background-color: #65778e;
+    }
+    .plan-list::-webkit-scrollbar-button {
+      display: none;
+    }
+  }
+}
+@media (max-width: 1023px) {
+  .plan-shelf {
+    margin-top: 14px;
+    padding-top: 10px;
+  }
+  .plan-list {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .plan-card {
+    flex: 0 0 min(260px, 84%);
+    scroll-snap-align: start;
+  }
+  .plan-toolbar {
+    padding: 10px 12px;
+  }
+}
+@media (forced-colors: active) {
+  .plan-list {
+    scrollbar-color: auto;
+  }
+  .plan-card[data-viewing="true"] {
+    outline: 1px solid Highlight;
+    outline-offset: -2px;
+  }
+}

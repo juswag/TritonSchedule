@@ -1,6 +1,11 @@
+import { z } from "zod";
 import type { Course, DiscussionSection } from "@/data/sampleCourses";
 import type { CalendarCourse, CalendarEvent, CalendarExam } from "@/types/calendar";
 import { getCourseCode } from "@/lib/courseLabels";
+
+export const calendarExamSchema = z.object({
+  id: z.string(), type: z.enum(["midterm", "final"]), name: z.string(), time: z.string(), location: z.string(),
+});
 
 export interface ScheduledExam {
   id: string;
