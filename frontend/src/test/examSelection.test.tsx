@@ -80,8 +80,8 @@ describe("exam metadata through course selection", () => {
     expect(within(midterms).getByText("MIDTERM ROOM")).toBeVisible();
     expect(within(midterms).getByText("SELECTED EXAM ROOM")).toBeVisible();
     expect(within(finals).getByText("FINAL ROOM")).toBeVisible();
-    expect(within(midterms).getAllByRole("row")).toHaveLength(3);
-    expect(within(finals).getAllByRole("row")).toHaveLength(2);
+    expect(within(midterms).getAllByRole("cell")).toHaveLength(6);
+    expect(within(finals).getAllByRole("cell")).toHaveLength(3);
     expect(screen.queryByText("UNSELECTED EXAM ROOM")).not.toBeInTheDocument();
     expect(screen.queryByText(/Exam details weren’t saved/)).not.toBeInTheDocument();
   });
@@ -259,14 +259,14 @@ describe("courses with published exams but no weekly meetings", () => {
     expect(savedEvents()).toEqual([]);
     search.unmount();
     render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
-    expect(screen.getByText("1 course")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Weekly classes" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText(course.Name)).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Exams" }), { button: 0, ctrlKey: false });
-    expect(screen.getByText("No weekly meetings")).toBeVisible();
+    expect(within(screen.getByRole("list", { name: "Courses without weekly meetings" })).getByText(course.Name)).toBeVisible();
     expect(within(screen.getByRole("table", { name: "Midterms" })).getByText("MIDTERM ROOM")).toBeVisible();
     expect(within(screen.getByRole("table", { name: "Finals" })).getByText("FINAL ROOM")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: `Remove ${course.Name}` }));
-    expect(screen.getByText("0 courses")).toBeVisible();
+    expect(screen.queryByRole("list", { name: "Courses without weekly meetings" })).not.toBeInTheDocument();
     expect(screen.getByText("Add courses to see their exam details")).toBeVisible();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]")).toEqual([]));
   });

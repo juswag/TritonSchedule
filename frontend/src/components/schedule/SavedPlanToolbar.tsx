@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Bookmark, Check, X } from "lucide-react";
 import type { SavedPlan } from "@/lib/savedSchedules";
 
@@ -29,6 +30,7 @@ export function SavedPlanToolbar({
   onSave,
   canSave,
   applying,
+  children,
 }: {
   active?: SavedPlan;
   preview?: SavedPlan;
@@ -37,9 +39,10 @@ export function SavedPlanToolbar({
   onSave: () => void;
   canSave: boolean;
   applying: boolean;
+  children: ReactNode;
 }) {
   return (
-    <div className="plan-toolbar">
+    <div className="plan-toolbar schedule-controls">
       <div className="flex min-w-0 items-center gap-2">
         {preview && (
           <button
@@ -66,6 +69,7 @@ export function SavedPlanToolbar({
           )
         )}
       </div>
+      {children}
       {preview ? (
         <button
           type="button"

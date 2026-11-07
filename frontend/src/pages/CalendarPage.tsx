@@ -23,6 +23,8 @@ import "@/components/schedule/savedSchedules.css";
 import {
   AlertTriangle,
   CalendarPlus,
+  CalendarDays,
+  ClipboardList,
   Eraser,
   Check,
   ChevronLeft,
@@ -736,11 +738,34 @@ export default function CalendarPage() {
     : previewing && shown
       ? previewEvents
       : termEvents;
-  const examSchedule = getExamSchedule(displayedEvents, termExamCourses);
+  const calendarEvents = paintEvents(displayedEvents);
+  const examSchedule = getExamSchedule(calendarEvents, termExamCourses);
   const courseCount = new Set([
     ...displayedEvents.filter((e) => e.isCourse).map((e) => e.courseId || e.id),
     ...termExamCourses.map((course) => course.id),
   ]).size;
+
+  const conflictCount = examSchedule.conflicts.length;
+  const viewSwitcher = (
+    <TabsList aria-label="Schedule views" className="schedule-view-switch">
+      <TabsTrigger value="weekly">
+        <CalendarDays aria-hidden="true" size={15} /> Weekly classes
+      </TabsTrigger>
+      <TabsTrigger value="exams">
+        <ClipboardList aria-hidden="true" size={15} /> Exams
+        {conflictCount > 0 && (
+          <span className="exam-conflict-count">
+            <AlertTriangle aria-hidden="true" size={12} />
+            {conflictCount}
+            <span className="sr-only">
+              {" "}
+              {conflictCount === 1 ? "conflict" : "conflicts"}
+            </span>
+          </span>
+        )}
+      </TabsTrigger>
+    </TabsList>
+  );
 
   return (
     <div
@@ -961,38 +986,7 @@ export default function CalendarPage() {
           aria-label="Calendar"
         >
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList
-              aria-label="Schedule views"
-              className="h-auto w-full flex-wrap justify-start gap-1 sm:gap-2 rounded-none border-b border-border bg-transparent p-0"
-            >
-              <TabsTrigger
-                value="weekly"
-                className="rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
-              >
-                Weekly classes
-              </TabsTrigger>
-              <TabsTrigger
-                value="exams"
-                className="gap-2 rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
-              >
-                Exams
-                {examSchedule.conflicts.length > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">
-                    <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
-                    {examSchedule.conflicts.length}{" "}
-                    {examSchedule.conflicts.length === 1
-                      ? "conflict"
-                      : "conflicts"}
-                  </span>
-                )}
-              </TabsTrigger>
-              {courseCount > 0 && (
-                <span className="ml-auto whitespace-nowrap px-2 text-xs text-muted-foreground">
-                  {courseCount} {courseCount === 1 ? "course" : "courses"}
-                </span>
-              )}
-            </TabsList>
-            <TabsContent value="weekly" className="mt-0">
+            <header>
               {!previewing && (
                 <SavedPlanToolbar
                   active={activePlan}
@@ -1002,7 +996,9 @@ export default function CalendarPage() {
                   onSave={openSave}
                   canSave={canSavePlan}
                   applying={applying}
-                />
+                >
+                  {viewSwitcher}
+                </SavedPlanToolbar>
               )}
               <div
                 className={
@@ -1028,6 +1024,7 @@ export default function CalendarPage() {
                 )}
                 {previewing && (
                   <>
+                    {!shown && <div className="mb-3">{viewSwitcher}</div>}
                     {dirty && (
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
                         <p role="status" className="text-sm">
@@ -1113,7 +1110,7 @@ export default function CalendarPage() {
                         <span className="sr-only" aria-live="polite">
                           {resultCount}
                         </span>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="schedule-controls">
                           <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                             <button
                               type="button"
@@ -1173,7 +1170,8 @@ export default function CalendarPage() {
                               </button>
                             </div>
                           </div>
-                          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+                          {viewSwitcher}
+                          <div className="schedule-result-actions flex flex-wrap items-center gap-2">
                             <div className="min-w-40 flex-1 sm:flex-none">
                               <Select
                                 disabled={applying}
@@ -1293,9 +1291,11 @@ export default function CalendarPage() {
                   </>
                 )}
               </div>
+            </header>
+            <TabsContent value="weekly" className="mt-0">
               <WeekCalendar
                 className="rounded-none border-0"
-                events={paintEvents(displayedEvents)}
+                events={calendarEvents}
                 rangeEvents={savedPreview ? displayedEvents : rangeEvents}
                 focusHours={true}
                 highlightedCourse={highlightedCourse}
@@ -1305,10 +1305,11 @@ export default function CalendarPage() {
                 }
               />
             </TabsContent>
-            <TabsContent value="exams" className="mt-0 p-4">
+            <TabsContent value="exams" className="mt-0">
               <ExamSchedule
                 {...examSchedule}
                 courseCount={courseCount}
+                hasDraftCourses={visibleCourses.length > 0}
                 examOnlyCourses={termExamCourses}
                 onRemoveCourse={deleteEventsByCourseId}
               />

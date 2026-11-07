@@ -273,3 +273,114 @@
     outline-offset: -2px;
   }
 }
+
+.plan-calendar {
+  container-type: inline-size;
+}
+
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.schedule-controls > :first-child {
+  margin-inline-end: auto;
+}
+
+.schedule-view-switch[role="tablist"] {
+  width: fit-content;
+  height: auto;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 7px;
+  background-color: hsl(var(--muted));
+}
+
+.schedule-view-switch [role="tab"] {
+  gap: 6px;
+  min-height: 36px;
+  border-radius: 5px;
+  padding-inline: 10px;
+  color: hsl(var(--muted-foreground));
+}
+
+.schedule-view-switch [role="tab"]:hover {
+  color: hsl(var(--foreground));
+}
+
+.schedule-view-switch [role="tab"][data-state="active"] {
+  color: hsl(var(--primary));
+  background-color: hsl(var(--card));
+  box-shadow: 0 1px 3px hsl(var(--foreground) / 0.14);
+}
+
+.exam-conflict-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #92400e;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .exam-conflict-count {
+  color: #fcd34d;
+}
+
+@container (max-width: 56rem) {
+  .schedule-result-actions {
+    flex: 1 0 100%;
+    justify-content: flex-end;
+  }
+}
+
+@container (max-width: 35rem) {
+  .schedule-controls {
+    gap: 8px;
+  }
+  .schedule-result-actions > * {
+    flex: 1 1 auto;
+  }
+  .schedule-result-actions > :first-child {
+    min-width: 8rem;
+  }
+}
+
+.exam-entry + .exam-entry {
+  border-top: 1px solid hsl(var(--border) / 0.55);
+}
+.exam-agenda tbody + tbody th {
+  border-top: 8px solid hsl(var(--card));
+  background-clip: padding-box;
+}
+@container (max-width: 43rem) {
+  .exam-agenda, .exam-agenda tbody, .exam-agenda tbody > tr > th {
+    display: block;
+  }
+  .exam-agenda colgroup {
+    display: none;
+  }
+  .exam-agenda tbody > tr {
+    display: block;
+  }
+  .exam-agenda .exam-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px 16px;
+    padding: 12px;
+  }
+  .exam-entry td {
+    display: block;
+    padding: 0;
+  }
+  .exam-entry .exam-course {
+    flex: 1 0 100%;
+  }
+  .exam-entry .exam-time {
+    margin-left: 18px;
+  }
+}
