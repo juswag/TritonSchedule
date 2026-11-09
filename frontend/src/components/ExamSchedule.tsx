@@ -1,5 +1,5 @@
 import { type CSSProperties, Fragment, useId } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, X } from "lucide-react";
 import type { CalendarCourse } from "@/types/calendar";
 import type { ExamConflict, ScheduledExam } from "@/lib/examSchedule";
 
@@ -100,7 +100,20 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
                               </span>
                             </td>
                             <td role="cell" className="block py-1 text-muted-foreground md:table-cell md:px-5 md:py-4">
-                              <span className="md:hidden">Location: </span>{exam.location || "TBD"}
+                              <div className="flex items-center justify-between gap-2">
+                                <span><span className="md:hidden">Location: </span>{exam.location || "TBD"}</span>
+                                {onRemoveCourse && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onRemoveCourse(exam.courseId)}
+                                    aria-label={`Remove ${exam.courseTitle} from schedule`}
+                                    title="Remove course from schedule"
+                                    className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    <X aria-hidden="true" className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                           {notices.map((conflict) => (

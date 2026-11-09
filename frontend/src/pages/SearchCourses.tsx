@@ -150,7 +150,7 @@ export default function SearchCourses() {
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
   const [selectedLabIds, setSelectedLabIds] = useState<Record<string, string>>({});
-  const { events, examOnlyCourses, addEvent, addExamOnlyCourse } = useCalendar();
+  const { events, examOnlyCourses, addEvent, addExamOnlyCourse, deleteEventsByCourseId } = useCalendar();
 
   useEffect(() => {
     sessionStorage.setItem("searchCoursesQuery", searchQuery);
@@ -735,11 +735,13 @@ export default function SearchCourses() {
                     type="button"
                     aria-describedby={conflictingScheduledEvents.length ? "selection-conflict-warning" : undefined}
                     disabled={
-                      addedCourseIds.has(selectedCourse.id) ||
-                      (candidateScheduleEvents.length === 0 && !canSaveExamOnly)
+                      !addedCourseIds.has(selectedCourse.id) &&
+                      candidateScheduleEvents.length === 0 && !canSaveExamOnly
                     }
                     onClick={() =>
-                      handleAddToCalendar(
+                      addedCourseIds.has(selectedCourse.id)
+                        ? deleteEventsByCourseId(selectedCourse.id)
+                        : handleAddToCalendar(
                         selectedCourse,
                         selectedDiscussion,
                         selectedLab
@@ -748,7 +750,7 @@ export default function SearchCourses() {
                     className="h-12 w-full rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                   >
                     {addedCourseIds.has(selectedCourse.id)
-                      ? "Added to schedule"
+                      ? "Remove from schedule"
                       : conflictingScheduledEvents.length > 0
                         ? "Add with conflict"
                         : "Add section"}
