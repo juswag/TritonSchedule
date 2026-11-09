@@ -55,7 +55,7 @@ describe("exam metadata through course selection", () => {
     const add = await screen.findByRole("button", { name: "Add section" });
     expect(add).toBeEnabled();
     fireEvent.click(add);
-    await screen.findByRole("button", { name: "Added to schedule" });
+    await screen.findByRole("button", { name: "Remove from schedule" });
 
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem("calendarEvents") ?? "[]") as CalendarEvent[];
@@ -273,7 +273,7 @@ describe("courses with published exams but no weekly meetings", () => {
     const add = await screen.findByRole("button", { name: "Add section" });
     expect(add).toBeEnabled();
     fireEvent.click(add);
-    expect(await screen.findByRole("button", { name: "Added to schedule" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Remove from schedule" })).toBeEnabled();
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]");
       expect(stored).toHaveLength(1);
@@ -302,5 +302,46 @@ describe("courses with published exams but no weekly meetings", () => {
     renderSearch();
     expect(await screen.findByRole("button", { name: "Add section" })).toBeDisabled();
     expect(screen.getByText("No discussion sections have a usable time that fits the selected course meetings.")).toBeVisible();
+  });
+});
+
+describe("removing scheduled courses from either view", () => {
+  it("removes all meetings from the details panel, preserves other events and allows re-adding", async () => {
+    const personal = { id: "personal", title: "Lunch", dayOfWeek: "Mon", startTime: "12:00", endTime: "13:00", color: "#333", isCourse: false };
+    localStorage.setItem("calendarEvents", JSON.stringify([personal]));
+    renderSearch();
+    fireEvent.click(await screen.findByRole("button", { name: "Add section" }));
+    await waitFor(() => expect(savedEvents()).toHaveLength(5));
+    fireEvent.click(screen.getByRole("button", { name: "Remove from schedule" }));
+    await waitFor(() => expect(savedEvents()).toEqual([personal]));
+    fireEvent.click(screen.getByRole("button", { name: "Add section" }));
+    await waitFor(() => expect(savedEvents()).toHaveLength(5));
+  });
+
+  it("removes exam-only courses from the details panel and allows re-adding", async () => {
+    mockCatalog([{ ...course, Lecture: { Days: "TBA", Time: "TBA" }, Discussions: [] }]);
+    renderSearch();
+    fireEvent.click(await screen.findByRole("button", { name: "Add section" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove from schedule" }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]")).toEqual([]));
+    expect(savedEvents()).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Add section" }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]")).toHaveLength(1));
+  });
+
+  it("removes a whole course using its final row and persists the change on reload", async () => {
+    const search = renderSearch();
+    fireEvent.click(await screen.findByRole("button", { name: "Add section" }));
+    await waitFor(() => expect(savedEvents()).toHaveLength(4));
+    search.unmount();
+    const calendar = render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Exams" }), { button: 0, ctrlKey: false });
+    const finals = screen.getByRole("table", { name: "Finals" });
+    fireEvent.click(within(finals).getByRole("button", { name: `Remove ${course.Name} from schedule` }));
+    expect(screen.getByText("Add courses to see their exam details")).toBeVisible();
+    await waitFor(() => expect(savedEvents()).toEqual([]));
+    calendar.unmount();
+    renderSearch();
+    expect(await screen.findByRole("button", { name: "Add section" })).toBeEnabled();
   });
 });

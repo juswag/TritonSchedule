@@ -91,7 +91,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteEventsByCourseId = (courseId: string) => {
-    setEvents((prev) => prev.filter((event) => event.courseId !== courseId));
+    setEvents((prev) => prev.filter((event) => event.courseId !== courseId && !(event.isCourse && !event.courseId && event.id === courseId)));
     setExamOnlyCourses((prev) => prev.filter((course) => course.id !== courseId));
   };
 
