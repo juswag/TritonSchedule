@@ -281,10 +281,11 @@ export default function SearchCourses() {
   );
 
   const availableDiscussionSections = useMemo(
-    () => filterConflictFreeSections(
+    () => getSectionOptions(
       selectedCourse,
       selectedCourse?.discussionSections,
-      [...scheduledEvents, ...candidateLectureEvents],
+      candidateLectureEvents,
+      scheduledEvents,
       "Discussion"
     ),
     [selectedCourse, scheduledEvents, candidateLectureEvents]
@@ -308,10 +309,11 @@ export default function SearchCourses() {
   );
 
   const availableLabSections = useMemo(
-    () => filterConflictFreeSections(
+    () => getSectionOptions(
       selectedCourse,
       selectedCourse?.labSections,
-      [...scheduledEvents, ...candidateLectureEvents, ...candidateDiscussionEvents],
+      [...candidateLectureEvents, ...candidateDiscussionEvents],
+      scheduledEvents,
       "Lab"
     ),
     [selectedCourse, scheduledEvents, candidateLectureEvents, candidateDiscussionEvents]
@@ -378,7 +380,6 @@ export default function SearchCourses() {
         : []),
       ...(selectedLab ? sectionScheduleToEvents(course, selectedLab, "Lab", calendarColor) : []),
     ];
-    const otherScheduledEvents = events.filter((event) => event.courseId !== course.id);
 
     const exams = getCourseExams(course, selectedDiscussion, selectedLab);
     if (eventsToAdd.length === 0) {
@@ -388,11 +389,6 @@ export default function SearchCourses() {
       } else {
         toast.error("Could not parse this course schedule for calendar placement.");
       }
-      return;
-    }
-
-    if (hasScheduleConflict(eventsToAdd, otherScheduledEvents)) {
-      toast.error("This selection conflicts with your existing schedule.");
       return;
     }
 
@@ -432,7 +428,7 @@ export default function SearchCourses() {
                 </span>
               </h1>
               <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-                Search the catalog and build a conflict-free quarter.
+                Search the catalog and plan your quarter.
               </p>
               <img
                 src="/illustrations/trident-doodle.png"
@@ -699,12 +695,6 @@ export default function SearchCourses() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Current schedule + this selection</p>
-                  {conflictingScheduledEvents.length > 0 && (
-                    <div className="mt-3 flex gap-2 rounded-md border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40 px-3 py-2.5 text-xs leading-5 text-rose-800 dark:text-rose-200">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>{formatConflictMessage(conflictingScheduledEvents)}</p>
-                    </div>
-                  )}
                   <CourseSchedulePreview
                     existingEvents={scheduledEvents}
                     candidateEvents={candidateScheduleEvents}
@@ -714,6 +704,12 @@ export default function SearchCourses() {
               </div>
 
               <div className="-mx-5 shrink-0 border-t border-border bg-[#fefefe] dark:bg-background px-5 pb-6 pt-4 sm:-mx-7 sm:px-7 lg:-mx-8 lg:px-8 xl:mx-0 xl:px-0 xl:pb-0">
+                {conflictingScheduledEvents.length > 0 && (
+                  <div role="status" id="selection-conflict-warning" className="mb-3 flex gap-2 rounded-md border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40 px-3 py-2.5 text-xs leading-5 text-rose-800 dark:text-rose-200">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>{formatConflictMessage(conflictingScheduledEvents)}</p>
+                  </div>
+                )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {selectedTssUrl ? (
                     <a
@@ -737,9 +733,9 @@ export default function SearchCourses() {
                   )}
                   <button
                     type="button"
+                    aria-describedby={conflictingScheduledEvents.length ? "selection-conflict-warning" : undefined}
                     disabled={
                       addedCourseIds.has(selectedCourse.id) ||
-                      conflictingScheduledEvents.length > 0 ||
                       (candidateScheduleEvents.length === 0 && !canSaveExamOnly)
                     }
                     onClick={() =>
@@ -754,7 +750,7 @@ export default function SearchCourses() {
                     {addedCourseIds.has(selectedCourse.id)
                       ? "Added to schedule"
                       : conflictingScheduledEvents.length > 0
-                        ? "Resolve schedule conflict"
+                        ? "Add with conflict"
                         : "Add section"}
                   </button>
                 </div>
@@ -810,7 +806,7 @@ function SectionPicker({
   onChange,
 }: {
   label: string;
-  sections?: DiscussionSection[];
+  sections?: SectionOption[];
   totalCount?: number;
   selectedId?: string;
   onChange: (sectionId: string) => void;
@@ -876,6 +872,7 @@ function SectionPicker({
                   >
                     <span className="min-w-0 flex-1">
                       <span className={cn("block text-sm font-semibold", isSelected ? "text-primary" : "text-foreground")}>{section.name}</span>
+                      {section.conflictsWithSchedule && <span className="text-xs font-medium text-rose-700 dark:text-rose-300">Schedule conflict</span>}
                       <span className="mt-1 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                         <span className="flex min-w-0 items-center gap-1.5">
                           <Clock3 className="h-3.5 w-3.5 shrink-0" />
@@ -899,7 +896,7 @@ function SectionPicker({
       ) : totalCount > 0 ? (
         <div className="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 px-3 py-3 text-sm text-amber-900 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>No conflict-free {label.toLowerCase()} sections are available.</span>
+          <span>No {label.toLowerCase()} sections have a usable time that fits the selected course meetings.</span>
         </div>
       ) : (
         <p className="mt-2 rounded-md border border-border bg-card px-3 py-3 text-sm text-muted-foreground">
@@ -908,7 +905,7 @@ function SectionPicker({
       )}
       {hiddenCount > 0 && sections && sections.length > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {hiddenCount} conflicting {label.toLowerCase()} section{hiddenCount === 1 ? "" : "s"} hidden
+          {hiddenCount} unavailable {label.toLowerCase()} section{hiddenCount === 1 ? "" : "s"} hidden
         </p>
       )}
     </div>
@@ -1058,21 +1055,25 @@ function resolveSelectedSection(
   return availableSections.find((section) => section.id === selectedId) ?? availableSections[0];
 }
 
-function filterConflictFreeSections(
+type SectionOption = DiscussionSection & { conflictsWithSchedule: boolean };
+
+function getSectionOptions(
   course: Course | null,
   sections: DiscussionSection[] | undefined,
+  courseMeetings: CalendarEvent[],
   scheduledEvents: CalendarEvent[],
   eventType: "Discussion" | "Lab"
-): DiscussionSection[] {
+): SectionOption[] {
   if (!course || !sections) {
     return [];
   }
 
   const color = generateCalendarColor(course.id);
-  return sections.filter((section) => {
+  return sections.flatMap((section) => {
     const sectionEvents = sectionScheduleToEvents(course, section, eventType, color);
-    return sectionEvents.length > 0 && !hasScheduleConflict(sectionEvents, scheduledEvents);
-  });
+    if (!sectionEvents.length || hasScheduleConflict(sectionEvents, courseMeetings)) return [];
+    return [{ ...section, conflictsWithSchedule: hasScheduleConflict(sectionEvents, scheduledEvents) }];
+  }).sort((a, b) => Number(a.conflictsWithSchedule) - Number(b.conflictsWithSchedule));
 }
 
 function courseScheduleToEvents(course: Course, color: string): CalendarEvent[] {

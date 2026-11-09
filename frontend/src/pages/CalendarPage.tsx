@@ -5,6 +5,7 @@ import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { cn } from "@/lib/utils";
 import { getCourseCode } from "@/lib/courseLabels";
+import { eventsOverlap } from "@/lib/scheduleConflicts";
 import { getExamSchedule } from "@/lib/examSchedule";
 import ExamSchedule from "@/components/ExamSchedule";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,27 +28,51 @@ function parseTime(time: string): number {
   return hours + minutes / 60;
 }
 
-function getEventStyle(event: CalendarEvent, overlappingEvents: CalendarEvent[], index: number) {
+function getEventStyle(event: CalendarEvent, columnCount: number, column: number) {
   const startTime = parseTime(event.startTime);
   const endTime = parseTime(event.endTime);
   const duration = endTime - startTime;
   const top = GRID_TOP_GUTTER + (startTime - START_HOUR) * HOUR_HEIGHT;
   const height = Math.max(duration * HOUR_HEIGHT, 34);
-  const overlapCount = overlappingEvents.length;
-  const width = overlapCount > 1 ? `${100 / overlapCount}%` : "100%";
-  const left = overlapCount > 1 ? `${(index * 100) / overlapCount}%` : "0";
+  const width = `${100 / columnCount}%`;
+  const left = `${(column * 100) / columnCount}%`;
 
   return { top, height, width, left };
 }
 
-function findOverlappingEvents(event: CalendarEvent, allEvents: CalendarEvent[]): CalendarEvent[] {
-  const eventStart = parseTime(event.startTime);
-  const eventEnd = parseTime(event.endTime);
+function layoutDay(events: CalendarEvent[]) {
+  const ordered = [...events].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
+  const groups: { columnEnds: number[]; items: { event: CalendarEvent; column: number }[] }[] = [];
+  for (const event of ordered) {
+    const start = parseTime(event.startTime);
+    let group = groups[groups.length - 1];
+    if (!group || group.columnEnds.every((end) => end <= start)) {
+      group = { columnEnds: [], items: [] };
+      groups.push(group);
+    }
+    const available = group.columnEnds.findIndex((end) => end <= start);
+    const column = available < 0 ? group.columnEnds.length : available;
+    group.columnEnds[column] = parseTime(event.endTime);
+    group.items.push({ event, column });
+  }
+  return groups.flatMap(({ columnEnds, items }) => items.map(({ event, column }) => ({
+    event, style: getEventStyle(event, columnEnds.length, column),
+  })));
+}
 
-  return allEvents.filter((other) => {
-    if (other.dayOfWeek !== event.dayOfWeek) return false;
-    return eventStart < parseTime(other.endTime) && eventEnd > parseTime(other.startTime);
-  });
+function meetingLabel(event: CalendarEvent) {
+  return event.isCourse ? getCourseCode(event.title) : event.title;
+}
+
+function ConflictMarker({ label }: { label?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" role={label ? "img" : undefined}
+      aria-label={label} aria-hidden={label ? undefined : true}
+      className="shrink-0 text-amber-700 dark:text-amber-300">
+      <rect width="14" height="14" rx="4" fill="currentColor" />
+      <path d="M6 3h2v5H6z M6 9h2v2H6z" className="fill-white dark:fill-amber-950" />
+    </svg>
+  );
 }
 
 export default function CalendarPage() {
@@ -55,6 +80,23 @@ export default function CalendarPage() {
   const [activeTab, setActiveTab] = useState("weekly");
   const examSchedule = useMemo(() => getExamSchedule(events, examOnlyCourses), [events, examOnlyCourses]);
   const [selectedMobileDay, setSelectedMobileDay] = useState<Weekday>("Mon");
+
+  const { conflictingIds, weeklyConflicts } = useMemo(() => {
+    const conflictingIds = new Set<string>();
+    const pairs = new Map<string, string>();
+    events.forEach((first, index) => {
+      for (const second of events.slice(index + 1)) {
+        if (!eventsOverlap(first, second)) continue;
+        conflictingIds.add(first.id);
+        conflictingIds.add(second.id);
+        const key = JSON.stringify([first, second].map(event =>
+          event.isCourse ? ["course", event.courseId || meetingLabel(event)] : ["event", event.id]
+        ).sort());
+        if (!pairs.has(key)) pairs.set(key, `${meetingLabel(first)} and ${meetingLabel(second)} overlap.`);
+      }
+    });
+    return { conflictingIds, weeklyConflicts: Array.from(pairs) };
+  }, [events]);
 
   const courseCount = useMemo(
     () => new Set([
@@ -118,6 +160,17 @@ export default function CalendarPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="weekly" className="mt-0">
+            {weeklyConflicts.length > 0 && (
+              <section aria-label="Weekly schedule conflicts" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <h2 className="flex items-center gap-2 font-semibold">
+                  <ConflictMarker />
+                  Weekly schedule conflict{weeklyConflicts.length > 1 ? "s" : ""}
+                </h2>
+                <ul className="mt-1 space-y-1">
+                  {weeklyConflicts.map(([key, message]) => <li key={key}>{message}</li>)}
+                </ul>
+              </section>
+            )}
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="sm:hidden">
             <div className="grid grid-cols-5 border-b border-border">
@@ -150,6 +203,12 @@ export default function CalendarPage() {
                     <span className="mt-1 h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: event.color }} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">{event.title}</p>
+                      {conflictingIds.has(event.id) && (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                          <ConflictMarker />
+                          Time conflict
+                        </span>
+                      )}
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatTo12Hour(event.startTime)} - {formatTo12Hour(event.endTime)}
                       </p>
@@ -212,13 +271,9 @@ export default function CalendarPage() {
                         />
                       ))}
 
-                      {dayEvents.map((event) => {
-                        const overlapping = findOverlappingEvents(event, dayEvents);
-                        const index = overlapping.findIndex((item) => item.id === event.id);
-                        const style = getEventStyle(event, overlapping, index);
-                        const blockTitle = event.isCourse
-                          ? getCourseCode(event.title)
-                          : event.title;
+                      {layoutDay(dayEvents).map(({ event, style }) => {
+                        const hasConflict = conflictingIds.has(event.id);
+                        const blockTitle = meetingLabel(event);
                         return (
                           <div
                             key={event.id}
@@ -233,14 +288,15 @@ export default function CalendarPage() {
                               title={`${event.title}\n${formatTo12Hour(event.startTime)} - ${formatTo12Hour(event.endTime)}${event.isCourse || event.location ? `\n${event.location || "Location unavailable"}` : ""}`}
                               style={{ "--event-color": event.color } as CSSProperties}
                             >
-                              <div className="flex min-w-0 shrink-0 items-baseline justify-between gap-2">
+                              <div className={cn("flex min-w-0 shrink-0 items-center", hasConflict ? "gap-1.5" : "justify-between gap-2")}>
+                                {hasConflict && <ConflictMarker label="Time conflict" />}
                                 <p className={cn(
                                   "truncate text-xs font-semibold",
                                   style.height >= 52 ? "leading-[14px]" : "leading-3"
                                 )}>
                                   {blockTitle}
                                 </p>
-                                {event.eventType && overlapping.length === 1 && (
+                                {event.eventType && !hasConflict && (
                                   <span className="max-w-[40%] truncate text-[10px] leading-3 opacity-80">{event.eventType}</span>
                                 )}
                               </div>
