@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { toast } from "sonner";
 import { MemoryRouter } from "react-router-dom";
 import { CalendarProvider } from "@/context/CalendarContext";
 import SearchCourses from "@/pages/SearchCourses";
@@ -39,6 +40,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
   sessionStorage.clear();
@@ -46,6 +48,7 @@ afterEach(() => {
 
 describe("exam metadata through course selection", () => {
   it("saves only the selected section exams and reloads them in the Exams tab", async () => {
+    const successToast = vi.spyOn(toast, "success");
     const search = render(
       <MemoryRouter initialEntries={["/courses?q=CSE%2011"]}>
         <CalendarProvider><SearchCourses /></CalendarProvider>
@@ -55,7 +58,8 @@ describe("exam metadata through course selection", () => {
     const add = await screen.findByRole("button", { name: "Add section" });
     expect(add).toBeEnabled();
     fireEvent.click(add);
-    await screen.findByRole("button", { name: "Remove from schedule" });
+    expect(await screen.findByRole("button", { name: "Remove from schedule" })).toBeEnabled();
+    expect(successToast).not.toHaveBeenCalled();
 
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem("calendarEvents") ?? "[]") as CalendarEvent[];
@@ -268,12 +272,14 @@ describe("course search selection and recovery", () => {
 
 describe("courses with published exams but no weekly meetings", () => {
   it("saves, reloads and removes the course without creating a weekly placeholder", async () => {
+    const successToast = vi.spyOn(toast, "success");
     mockCatalog([{ ...course, Lecture: { Days: "TBA", Time: "TBA" }, Discussions: [] }]);
     const search = renderSearch();
     const add = await screen.findByRole("button", { name: "Add section" });
     expect(add).toBeEnabled();
     fireEvent.click(add);
     expect(await screen.findByRole("button", { name: "Remove from schedule" })).toBeEnabled();
+    expect(successToast).not.toHaveBeenCalled();
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem("calendarExamOnlyCourses") ?? "[]");
       expect(stored).toHaveLength(1);
