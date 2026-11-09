@@ -58,6 +58,21 @@ describe("calendar class blocks", () => {
     }
   });
 
+  it("keeps a long meeting beside two back-to-back meetings", () => {
+    renderSchedule([
+      { ...lecture, endTime: "11:00" },
+      { ...lecture, id: "later", title: "Later meeting", startTime: "10:00", endTime: "11:00" },
+      { ...lecture, id: "earlier", title: "Earlier meeting", endTime: "10:00" },
+    ]);
+    for (const title of [/^Earlier meeting/, /^Later meeting/]) {
+      const style = screen.getByTitle(title).parentElement!.style;
+      expect(style.left).toBe("50%");
+      expect(style.width).toBe("50%");
+    }
+    expect(screen.getByTitle(/^CSE 100:/).parentElement!.style.left).toBe("0%");
+    expect(screen.getAllByRole("listitem").filter(item => item.textContent?.endsWith(" overlap."))).toHaveLength(2);
+  });
+
   it("keeps legacy events readable when no location was saved", () => {
     renderSchedule([{ ...lecture, location: undefined }]);
     expect(within(screen.getByTitle(/^CSE 100:/)).getByText("Location unavailable")).toBeInTheDocument();

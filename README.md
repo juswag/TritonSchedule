@@ -12,4 +12,4 @@
 
 - Search the active UCSD Class Planner catalog by course, title, or instructor and compare lecture, discussion, and lab choices against the current schedule.
 - Open the selected section combination in TSS when Class Planner supplies an official route that TritonSchedule can validate.
-- Add conflict-free course sections to a weekly calendar alongside custom events.
+- Add course sections and custom events to a weekly calendar, with warnings for overlapping meetings.

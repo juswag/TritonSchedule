@@ -193,25 +193,51 @@ describe("course search selection and recovery", () => {
       { Days: "Thu", Time: "11:00 AM - 11:50 AM" },
     ] }]);
     renderSearch();
-    expect(await screen.findByText("2 conflicting discussion sections hidden")).toBeVisible();
+    expect(await screen.findByText("2 unavailable discussion sections hidden")).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Choose discussion section" })).toHaveTextContent("Discussion 3");
+  });
+
+  it("offers a conflicting discussion and defaults to the free section", async () => {
+    localStorage.setItem("calendarEvents", JSON.stringify([
+      { id: "study", title: "Study group", dayOfWeek: "Tue", startTime: "11:15", endTime: "12:00", color: "#123456" },
+    ]));
+    renderSearch();
+    const picker = await screen.findByRole("combobox", { name: "Choose discussion section" });
+    expect(picker).toHaveTextContent("A02");
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole("option", { name: /A01.*Schedule conflict/ }));
+    expect(screen.getByText(/Conflicts with Study group on Tue/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Add with conflict" }));
+    await waitFor(() => expect(savedEvents().some((event) => event.location === "DISCUSSION ROOM")).toBe(true));
   });
 
   it("explains when every discussion is unavailable", async () => {
     mockCatalog([{ ...course, Discussions: [{ Days: "ARRANGED", Time: "" }] }]);
     renderSearch();
-    expect(await screen.findByText("No conflict-free discussion sections are available.")).toBeVisible();
+    expect(await screen.findByText("No discussion sections have a usable time that fits the selected course meetings.")).toBeVisible();
   });
 
-  it("blocks adding a lecture that overlaps the saved schedule", async () => {
+  it("warns before adding an overlapping lecture and clears the calendar warning after removal", async () => {
     localStorage.setItem("calendarEvents", JSON.stringify([
       { id: "existing", courseId: "other", title: "MATH 20B (A01)", dayOfWeek: "Mon", startTime: "10:15", endTime: "11:00", color: "#123456", isCourse: true },
+      { id: "existing-wed", courseId: "other", title: "MATH 20B (A01)", dayOfWeek: "Wed", startTime: "10:15", endTime: "11:00", color: "#123456", isCourse: true },
       { id: "free", title: "Study", dayOfWeek: "Fri", startTime: "15:00", endTime: "16:00", color: "#123456" },
     ]));
-    renderSearch();
-    expect(await screen.findByRole("button", { name: "Resolve schedule conflict" })).toBeDisabled();
+    const search = renderSearch();
+    const add = await screen.findByRole("button", { name: "Add with conflict" });
+    expect(add).toBeEnabled();
     expect(screen.getByText(/Conflicts with MATH 20B on Mon/)).toBeVisible();
-    expect(savedEvents()).toHaveLength(2);
+    fireEvent.click(add);
+    await waitFor(() => expect(savedEvents()).toHaveLength(7));
+    search.unmount();
+    render(<MemoryRouter><CalendarProvider><CalendarPage /></CalendarProvider></MemoryRouter>);
+    const notices = within(screen.getByRole("region", { name: "Weekly schedule conflicts" })).getAllByRole("listitem");
+    expect(notices).toHaveLength(1);
+    expect(notices[0].textContent).toBe("MATH 20B and CSE 11 overlap.");
+    expect(screen.getAllByLabelText("Time conflict")).toHaveLength(4);
+    expect(screen.getAllByText("Time conflict")).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove MATH 20B (A01)" })[0]);
+    expect(screen.queryByRole("region", { name: "Weekly schedule conflicts" })).toBeNull();
   });
 
   it.each([[4.8, "Excellent"], [4.2, "Very good"], [3.4, "Good"], [2.5, "Mixed"]])("shows verified professor details with rating %s", async (rating, label) => {
@@ -275,6 +301,6 @@ describe("courses with published exams but no weekly meetings", () => {
     mockCatalog([{ ...course, Lecture: { Days: "TBA", Time: "TBA" }, Discussions: [{ Days: "TBA", Time: "TBA" }] }]);
     renderSearch();
     expect(await screen.findByRole("button", { name: "Add section" })).toBeDisabled();
-    expect(screen.getByText("No conflict-free discussion sections are available.")).toBeVisible();
+    expect(screen.getByText("No discussion sections have a usable time that fits the selected course meetings.")).toBeVisible();
   });
 });
