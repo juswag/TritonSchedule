@@ -385,7 +385,6 @@ export default function SearchCourses() {
     if (eventsToAdd.length === 0) {
       if (canSaveExamOnly) {
         addExamOnlyCourse({ id: course.id, title: course.name, color: calendarColor, exams });
-        toast.success(`${course.name} exams added to your calendar!`);
       } else {
         toast.error("Could not parse this course schedule for calendar placement.");
       }
@@ -393,12 +392,6 @@ export default function SearchCourses() {
     }
 
     eventsToAdd.forEach((event) => addEvent({ ...event, courseTitle: course.name, exams }));
-
-    const selectedSections = [selectedDiscussion?.name, selectedLab?.name].filter(
-      (name): name is string => Boolean(name)
-    );
-    const sectionInfo = selectedSections.length > 0 ? ` (${selectedSections.join(", ")})` : "";
-    toast.success(`${course.name}${sectionInfo} added to your calendar!`);
   };
 
   const setSelectedDiscussionForCourse = (courseId: string, discussionId: string) => {
