@@ -35,10 +35,22 @@ type TssModuleRouteRow = {
   tss_url: string;
 };
 
+type RoomDetail = Pick<ClassPlannerMeeting,
+  "meeting_kind" | "day_code" | "specific_date" | "start_minutes" | "end_minutes" |
+  "is_remote" | "building_code" | "building_name" | "room_code" | "room_name"
+>;
+
+type ManualSectionDetails = {
+  rooms: RoomDetail[];
+  packages: TssPackageRow[];
+  route: TssModuleRouteRow | null;
+};
+
 type SectionRow = Omit<ClassPlannerSection, "event_package_ids" | "meetings"> & {
   id: number;
   class_planner_section_meetings: MeetingRow[];
   tss_event_packages?: TssPackageRow[];
+  manual_details?: ManualSectionDetails | null;
 };
 
 type OfferingRow = Omit<ClassPlannerCourse, "sections"> & {
@@ -116,13 +128,48 @@ export function exactSubjectCodeFromSearch(value: string): string | null {
   return NORMALIZED_SUBJECT_CODES.has(normalizedValue) ? normalizedValue : null;
 }
 
+function applyManualDetails(section: SectionRow): SectionRow {
+  const details = section.manual_details;
+  if (!details) return section;
+
+  const savedUrls = new Map(details.packages.map((pkg) => [pkg.event_package_id, pkg.tss_booking_url]));
+  const packages = (section.tss_event_packages ?? []).map((pkg) => ({
+    ...pkg,
+    tss_booking_url: savedUrls.get(pkg.event_package_id) ?? pkg.tss_booking_url,
+  }));
+
+  const meetings = section.class_planner_section_meetings;
+  const sameSlot = (left: RoomDetail, right: RoomDetail) =>
+    left.meeting_kind === right.meeting_kind && left.day_code === right.day_code &&
+    left.specific_date === right.specific_date && left.start_minutes === right.start_minutes &&
+    left.end_minutes === right.end_minutes && left.is_remote === right.is_remote;
+
+  const enrichedMeetings = meetings.map((meeting) => {
+    const saved = details.rooms.filter((room) => sameSlot(room, meeting));
+    const current = meetings.filter((row) => sameSlot(row, meeting));
+    // Rows in the same slot are indistinguishable. Restore their room set only
+    // when the public schedule still contains the same number of meetings.
+    const room = saved.length === current.length ? saved[current.indexOf(meeting)] : undefined;
+    return {
+      ...meeting,
+      building_code: room?.building_code ?? meeting.building_code,
+      building_name: room?.building_name ?? meeting.building_name,
+      room_code: room?.room_code ?? meeting.room_code,
+      room_name: room?.room_name ?? meeting.room_name,
+    };
+  });
+
+  return { ...section, class_planner_section_meetings: enrichedMeetings, tss_event_packages: packages };
+}
+
 export function mapOfferingToCourses(
   row: OfferingRow,
   ratingsByNameKey: ReadonlyMap<string, RMP> = new Map(),
 ): Array<Course & { id: string }> {
+  const sections = row.class_planner_sections.map(applyManualDetails);
   const classPlannerCourse: ClassPlannerCourse = {
     ...row,
-    sections: row.class_planner_sections
+    sections: sections
       .map((section): ClassPlannerSection => ({
         ...section,
         event_package_ids: (section.tss_event_packages ?? [])
@@ -140,7 +187,7 @@ export function mapOfferingToCourses(
   const sectionChoices: Array<ClassPlannerSection | undefined> =
     primarySections.length > 0 ? primarySections : [undefined];
   const tssPackageUrls = Object.fromEntries(
-    row.class_planner_sections.flatMap((section) =>
+    sections.flatMap((section) =>
       (section.tss_event_packages ?? []).flatMap((eventPackage) =>
         eventPackage.tss_booking_url
           ? [[eventPackage.event_package_id, eventPackage.tss_booking_url] as const]
@@ -151,9 +198,7 @@ export function mapOfferingToCourses(
   const route = Array.isArray(row.tss_module_routes)
     ? row.tss_module_routes[0]
     : row.tss_module_routes;
-  const tssFallbackUrl = route?.route_kind === "module"
-    ? route.tss_url
-    : undefined;
+  const manualBySection = new Map(sections.map((s) => [s.section_id, s.manual_details]));
 
   return sectionChoices.map((primarySection) => {
     // Other primary sections and optional discussions can have different exams.
@@ -177,6 +222,8 @@ export function mapOfferingToCourses(
         )
       : tssPackageUrls;
 
+    const details = primarySection ? manualBySection.get(primarySection.section_id) : sections[0]?.manual_details;
+    const sectionRoute = details ? details.route : route;
     return {
       ...baseCourse,
       Midterms: sectionCourse.Midterms,
@@ -189,7 +236,7 @@ export function mapOfferingToCourses(
       nameKey,
       rmp: ratingsByNameKey.get(nameKey) ?? null,
       TssPackageUrls: relevantTssPackageUrls,
-      TssFallbackUrl: tssFallbackUrl,
+      TssFallbackUrl: sectionRoute?.route_kind === "module" ? sectionRoute.tss_url : undefined,
     };
   });
 }
@@ -271,6 +318,7 @@ export async function searchCourses(course: string, term: string) {
           waitlist_available,
           status,
           instructors,
+          manual_details (rooms, packages, route),
           tss_event_packages (
             event_package_id,
             tss_booking_url
@@ -376,6 +424,19 @@ export async function replaceCatalog(
   term: string,
   catalog: ClassPlannerCatalogSnapshot,
 ) {
+  return stageAndPublishCatalog(term, catalog, "finalize_class_planner_catalog_refresh");
+}
+
+/** Publishes only manually imported rooms and TSS data for the selected term. */
+export async function replaceManualCatalogDetails(term: string, catalog: ClassPlannerCatalogSnapshot) {
+  return stageAndPublishCatalog(term, catalog, "finalize_class_planner_manual_details");
+}
+
+async function stageAndPublishCatalog(
+  term: string,
+  catalog: ClassPlannerCatalogSnapshot,
+  finalize: "finalize_class_planner_catalog_refresh" | "finalize_class_planner_manual_details",
+) {
   if (catalog.offerings.length <= 0) {
     throw new Error("Refusing to replace catalog with no offerings");
   }
@@ -421,7 +482,7 @@ export async function replaceCatalog(
     }
 
     const { error: finalizeError } = await supabase.rpc(
-      "finalize_class_planner_catalog_refresh",
+      finalize,
       { p_refresh_id: refreshId },
     );
     throwIfError(finalizeError);

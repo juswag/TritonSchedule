@@ -73,10 +73,10 @@ export function buildClassPlannerCatalog(
     const sourceKey = classPlannerSourceKey(course);
     const route = routeBySourceKey.get(sourceKey);
 
-    const packageRoute = route ? parseEventPackageRoute(route.tss_url) : null;
+    const packageRoute = route?.tss_url ? parseEventPackageRoute(route.tss_url) : null;
     const routeKind = packageRoute ? "event_package" : "module";
 
-    if (route?.representative_event_package_id && !packageRoute) {
+    if (route?.tss_url && route.representative_event_package_id && !packageRoute) {
       throw new Error(`Unsupported TSS event package route for ${sourceKey}`);
     }
 
@@ -174,7 +174,7 @@ export function buildClassPlannerCatalog(
       });
     }
 
-    if (route) moduleRoutes.push({
+    if (route?.tss_url) moduleRoutes.push({
       source_key: sourceKey,
       term_code: term,
       module_id: route.module_id,
@@ -363,11 +363,18 @@ function displayLocation(meeting: ClassPlannerMeeting): string {
     return "TBA";
   }
 
-  if (meeting.room_code) {
-    return meeting.room_code;
+  const building = meeting.building_code?.trim() || meeting.building_name?.trim();
+  const room = meeting.room_code?.trim() || meeting.room_name?.trim();
+  if (!building || !room) {
+    return building || room || "TBA";
   }
 
-  return meeting.building_code ?? "TBA";
+  // Some UCSD room codes already include the building (for example, "CENTR 101").
+  const buildingPrefix = building.toUpperCase();
+  const roomLabel = room.toUpperCase();
+  const includesBuilding = roomLabel === buildingPrefix ||
+    roomLabel.startsWith(buildingPrefix + " ") || roomLabel.startsWith(buildingPrefix + "-");
+  return includesBuilding ? room : `${building} ${room}`;
 }
 
 function uniqueMeetings(
@@ -382,7 +389,7 @@ function uniqueMeetings(
       meeting.day_code,
       meeting.start_minutes,
       meeting.end_minutes,
-      meeting.room_code,
+      displayLocation(meeting),
     ].join("|");
     byKey.set(key, meeting);
   }

@@ -75,7 +75,7 @@ export type ClassPlannerResolvedRoute = Readonly<{
   source_key: string;
   module_id: string;
   representative_event_package_id: string | null;
-  tss_url: string;
+  tss_url: string | null;
 }>;
 
 export type ClassPlannerOfferingRecord = Readonly<{
