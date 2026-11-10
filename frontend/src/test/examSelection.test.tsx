@@ -359,7 +359,8 @@ describe("course search selection and recovery", () => {
 
   it("gives the course details panel even horizontal padding and hides its scrollbar", async () => {
     renderSearch();
-    const panel = await screen.findByRole("complementary", { name: "Selected course details" });
+    await screen.findByRole("button", { name: "Add section" });
+    const panel = screen.getByRole("complementary", { name: "Selected course details" });
     const scroll = panel.querySelector("[data-details-scroll]");
     const actions = panel.querySelector("[data-details-actions]");
     expect(scroll).toHaveClass("scrollbar-hidden", "overflow-y-auto", "px-5", "sm:px-7", "lg:px-8");
