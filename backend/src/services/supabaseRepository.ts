@@ -132,29 +132,34 @@ function applyManualDetails(section: SectionRow): SectionRow {
   const details = section.manual_details;
   if (!details) return section;
 
-  const packages = new Map<string, TssPackageRow>();
-  for (const { event_package_id } of section.tss_event_packages ?? []) {
-    packages.set(event_package_id, { event_package_id, tss_booking_url: null });
-  }
-  for (const pkg of details.packages) packages.set(pkg.event_package_id, pkg);
+  const savedUrls = new Map(details.packages.map((pkg) => [pkg.event_package_id, pkg.tss_booking_url]));
+  const packages = (section.tss_event_packages ?? []).map((pkg) => ({
+    ...pkg,
+    tss_booking_url: savedUrls.get(pkg.event_package_id) ?? pkg.tss_booking_url,
+  }));
 
-  const meetings = section.class_planner_section_meetings.map((meeting) => {
-    const matches = details.rooms.filter((room) =>
-      room.meeting_kind === meeting.meeting_kind && room.day_code === meeting.day_code &&
-      room.specific_date === meeting.specific_date && room.start_minutes === meeting.start_minutes &&
-      room.end_minutes === meeting.end_minutes && room.is_remote === meeting.is_remote);
-    // No upstream meeting ID. A changed or ambiguous time slot needs a fresh room assignment.
-    const room = matches.length === 1 ? matches[0] : undefined;
+  const meetings = section.class_planner_section_meetings;
+  const sameSlot = (left: RoomDetail, right: RoomDetail) =>
+    left.meeting_kind === right.meeting_kind && left.day_code === right.day_code &&
+    left.specific_date === right.specific_date && left.start_minutes === right.start_minutes &&
+    left.end_minutes === right.end_minutes && left.is_remote === right.is_remote;
+
+  const enrichedMeetings = meetings.map((meeting) => {
+    const saved = details.rooms.filter((room) => sameSlot(room, meeting));
+    const current = meetings.filter((row) => sameSlot(row, meeting));
+    // Rows in the same slot are indistinguishable. Restore their room set only
+    // when the public schedule still contains the same number of meetings.
+    const room = saved.length === current.length ? saved[current.indexOf(meeting)] : undefined;
     return {
       ...meeting,
-      building_code: room?.building_code ?? null,
-      building_name: room?.building_name ?? null,
-      room_code: room?.room_code ?? null,
-      room_name: room?.room_name ?? null,
+      building_code: room?.building_code ?? meeting.building_code,
+      building_name: room?.building_name ?? meeting.building_name,
+      room_code: room?.room_code ?? meeting.room_code,
+      room_name: room?.room_name ?? meeting.room_name,
     };
   });
 
-  return { ...section, class_planner_section_meetings: meetings, tss_event_packages: [...packages.values()] };
+  return { ...section, class_planner_section_meetings: enrichedMeetings, tss_event_packages: packages };
 }
 
 export function mapOfferingToCourses(

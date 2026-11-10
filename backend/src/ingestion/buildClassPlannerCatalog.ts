@@ -389,7 +389,7 @@ function uniqueMeetings(
       meeting.day_code,
       meeting.start_minutes,
       meeting.end_minutes,
-      meeting.room_code,
+      displayLocation(meeting),
     ].join("|");
     byKey.set(key, meeting);
   }

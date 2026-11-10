@@ -33,9 +33,9 @@ describe("mapOfferingToCourse", () => {
       ...course, id: 1, source_key: "updated-section-list", instructors_search: "",
       class_planner_sections: [{
         ...section, id: 99,
-        tss_event_packages: [{ event_package_id: "new-public-id", tss_booking_url: null }],
+        tss_event_packages: [{ event_package_id: "new-public-id", tss_booking_url: null }, { event_package_id: "current", tss_booking_url: null }],
         manual_details: {
-          rooms: [classMeeting], packages: [{ event_package_id: "manual-id", tss_booking_url: "booking" }],
+          rooms: [classMeeting], packages: [{ event_package_id: "removed", tss_booking_url: "stale" }, { event_package_id: "current", tss_booking_url: "booking" }],
           route: { route_kind: "module", tss_url: "module" },
         },
         class_planner_section_meetings: [
@@ -45,8 +45,8 @@ describe("mapOfferingToCourse", () => {
       }],
     });
     expect(result!.Lectures!.map(({ Location }) => Location)).toEqual(["TBA", "CENTR 101"]);
-    expect(result!.Lecture!.EventPackageIds).toEqual(["new-public-id", "manual-id"]);
-    expect(result!.TssPackageUrls).toEqual({ "manual-id": "booking" });
+    expect(result!.Lecture!.EventPackageIds).toEqual(["new-public-id", "current"]);
+    expect(result!.TssPackageUrls).toEqual({ current: "booking" });
     expect(result!.TssFallbackUrl).toBe("module");
   });
 
@@ -218,19 +218,22 @@ describe("mapOfferingToCourse", () => {
         ...course.sections[0]!,
         id: 1,
         tss_event_packages: [],
-        class_planner_section_meetings: [classMeeting, ...["CENTR 101", "CENTR 115"].map((room, index) => ({
-          ...classMeeting,
-          meeting_ordinal: index + 1,
-          meeting_kind: "final",
-          specific_date: "2026-12-07",
-          room_code: room,
+        manual_details: {
+          packages: [], route: null,
+          rooms: [classMeeting, ...["CENTR", "WLH"].map((building_code) => ({
+            ...classMeeting, meeting_kind: "final", specific_date: "2026-12-07", building_code, room_code: "101",
+          }))],
+        },
+        class_planner_section_meetings: [classMeeting, ...[1, 2].map((meeting_ordinal) => ({
+          ...classMeeting, meeting_ordinal, meeting_kind: "final", specific_date: "2026-12-07",
+          building_code: null, room_code: null, building_name: null, room_name: null,
         }))],
       }],
     });
 
     expect(result?.Lecture?.Exams).toEqual([
       { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "final" },
-      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 115", Type: "final" },
+      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "WLH 101", Type: "final" },
     ]);
   });
 
