@@ -350,6 +350,7 @@ describe("mapOfferingToCourse", () => {
       Teacher: "Ada Lovelace",
       SectionCode: "001-000-LE",
       Lecture: {
+        Enrollment: { enrolled: 90, capacity: 100, seatsAvailable: 10, waitlisted: 0 },
         Days: "Tue",
         Time: "5:00pm-6:20pm",
         Location: "CENTR 101",

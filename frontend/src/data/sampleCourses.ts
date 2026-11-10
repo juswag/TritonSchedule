@@ -1,10 +1,18 @@
 import type { CalendarExam } from "@/types/calendar";
 
+export interface Enrollment {
+  enrolled: number | null;
+  capacity: number | null;
+  seatsAvailable: number | null;
+  waitlisted: number | null;
+}
+
 export interface DiscussionSection {
   id: string;
   name: string;
   time: string;
   location: string;
+  enrollment?: Enrollment;
   /** Term-qualified Class Planner section reference. */
   sectionRef?: string;
   /** Class Planner display code for the section. */
@@ -28,6 +36,7 @@ export interface Course {
   schedule: string;
   description: string;
   color: string;
+  enrollment?: Enrollment;
   lectureLocation?: string;
   lectureMeetings?: DiscussionSection[];
   /** Term-qualified Class Planner reference for the primary section. */

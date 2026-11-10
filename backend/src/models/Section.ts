@@ -9,6 +9,12 @@ export type Section = {
   Days: string;
   Time: string;
   Location: string;
+  Enrollment?: {
+    enrolled: number | null;
+    capacity: number | null;
+    seatsAvailable: number | null;
+    waitlisted: number | null;
+  };
   /** Class Planner section identifier. */
   SectionId?: string;
   /** Term-qualified Class Planner section reference. */
