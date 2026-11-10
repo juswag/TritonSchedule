@@ -304,7 +304,12 @@ describe("course search selection and recovery", () => {
   it.each([[4.8, "Excellent", "high"], [4, "Very good", "high"], [3.6, "Good", "mid"], [3, "Good", "mid"], [2.9, "Mixed", "low"]] as const)("shows verified professor details with rating %s", async (rating, label, tier) => {
     mockCatalog([{ ...course, rmp: { avgRating: rating, avgDiff: 3, takeAgainPercent: 90, profileUrl: "https://www.ratemyprofessors.com/professor/123" }, TssFallbackUrl: "https://tss.ucsd.edu/fiori#YSchedule-view&/YUCSD_CON_MODULE(AcademicYear='2026',AcademicPeriod='FA',ModuleID='123')?layout=MidColumnFullScreen" }]);
     renderSearch();
-    expect(await screen.findByText(label)).toBeVisible();
+    const ratingLabel = await screen.findByText(label);
+    expect(ratingLabel).toBeVisible();
+    expect(ratingLabel).toHaveClass(...professorRatingTones[tier].text.split(" "));
+    const badge = screen.getByText(rating.toFixed(1), { selector: "[data-rating-tier]" });
+    expect(badge).toHaveAttribute("data-rating-tier", tier);
+    expect(badge).toHaveClass(...professorRatingTones[tier].badge.split(" "));
     const profile = screen.getByRole("link", { name: /on Rate My Professors/ });
     expect(profile.querySelector("svg.lucide-star")).toHaveAttribute("data-rating-tier", tier);
     expect(profile.querySelector("svg.lucide-star")).toHaveClass("fill-current", ...professorRatingTones[tier].icon.split(" "));
