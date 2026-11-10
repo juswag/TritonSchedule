@@ -121,6 +121,7 @@ describe("course search selection and recovery", () => {
     expect(screen.getByRole("textbox", { name: "Search courses" })).toHaveValue("CSE 11");
     expect(screen.getByRole("button", { name: /Select CSE 11/ })).toBeVisible();
     await screen.findByText("Fall 2026");
+    expect(screen.getByRole("button", { name: "Add section" })).toBeEnabled();
     const requests = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
     expect(requests).toHaveLength(1);
   });
@@ -130,7 +131,16 @@ describe("course search selection and recovery", () => {
     await screen.findByRole("button", { name: /Select CSE 11/ });
     first.unmount();
     mockCatalog([], 200, { Term: "WI27" });
+    let confirmTerm!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { confirmTerm = resolve; }));
     renderSearch("/courses");
+    expect(screen.getByRole("button", { name: /Select CSE 11/ })).toBeVisible();
+    const add = screen.getByRole("button", { name: "Add section" });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(savedEvents()).toEqual([]);
+
+    confirmTerm(new Response(JSON.stringify({ Term: "WI27" })));
     expect((await screen.findAllByText("No results"))[0]).toBeVisible();
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining("course=CSE%2011&term=WI27"), expect.anything());
   });

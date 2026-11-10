@@ -142,8 +142,8 @@ export default function SearchCourses() {
   const [initialCache] = useState(() => readCachedSearch(searchQuery.trim()));
   const [coursesFromBackend, setCoursesFromBackend] = useState<Course[]>(initialCache?.results ?? []);
   const [isBackendLoading, setIsBackendLoading] = useState(Boolean(searchQuery.trim() && !initialCache));
-  const [searchState, setSearchState] = useState<"idle" | "loading" | "success" | "not_found" | "error">(
-    initialCache?.searchState ?? "idle"
+  const [searchState, setSearchState] = useState<"idle" | "restored" | "loading" | "success" | "not_found" | "error">(
+    initialCache ? "restored" : "idle"
   );
   const [activeTerm, setActiveTerm] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -216,7 +216,7 @@ export default function SearchCourses() {
     if (activeTerm === null) return;
 
     const cached = readCachedSearch(query);
-    if (cached && cached.term === activeTerm) {
+    if (activeTerm && cached && cached.term === activeTerm) {
       setCoursesFromBackend(cached.results);
       setSearchState(cached.searchState);
       setIsBackendLoading(false);
@@ -740,7 +740,7 @@ export default function SearchCourses() {
                     aria-describedby={conflictingScheduledEvents.length ? "selection-conflict-warning" : undefined}
                     disabled={
                       !addedCourseIds.has(selectedCourse.id) &&
-                      candidateScheduleEvents.length === 0 && !canSaveExamOnly
+                      (searchState === "restored" || (candidateScheduleEvents.length === 0 && !canSaveExamOnly))
                     }
                     onClick={() =>
                       addedCourseIds.has(selectedCourse.id)
