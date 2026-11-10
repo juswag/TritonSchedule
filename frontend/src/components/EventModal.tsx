@@ -119,9 +119,9 @@ export function EventModal({
             </div>
 
             <div className="space-y-2">
-              <Label>Day</Label>
+              <Label htmlFor="event-day">Day</Label>
               <Select value={dayOfWeek} onValueChange={(value) => setDayOfWeek(value as Weekday)}>
-                <SelectTrigger>
+                <SelectTrigger id="event-day">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,9 +156,9 @@ export function EventModal({
             </div>
 
             <div className="space-y-2">
-              <Label>Color</Label>
+              <Label htmlFor="event-color">Color</Label>
               <Select value={color} onValueChange={setColor}>
-                <SelectTrigger>
+                <SelectTrigger id="event-color">
                   <SelectValue>
                     <div className="flex items-center gap-2">
                       <div
@@ -198,7 +198,7 @@ export function EventModal({
                 Delete
               </Button>
             )}
-            <Button type="submit">
+            <Button type="submit" className="rounded-full">
               {isEditing ? "Save Changes" : "Add Event"}
             </Button>
           </DialogFooter>

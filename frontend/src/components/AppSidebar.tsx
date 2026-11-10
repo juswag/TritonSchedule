@@ -13,7 +13,7 @@ export function AppSidebar() {
   const isLandingPage = location.pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 bg-card">
+    <header className={cn("sticky top-0 z-50 bg-card", !isLandingPage && "border-b border-border")}>
       <div className="flex h-[72px] w-full items-stretch justify-between px-4 sm:px-8">
         <NavLink
           to="/"
@@ -32,7 +32,7 @@ export function AppSidebar() {
           </span>
         </NavLink>
 
-        <div className="flex items-center gap-1 sm:gap-3">
+        <div className={cn("flex h-full items-center", isLandingPage ? "gap-1 sm:gap-3" : "gap-1 sm:gap-2")}>
           {isLandingPage ? (
             <nav className="flex items-center gap-1 text-sm font-medium text-foreground sm:gap-2" aria-label="Landing navigation">
               <a
@@ -66,9 +66,9 @@ export function AppSidebar() {
                     to={item.url}
                     aria-label={item.title}
                     className={cn(
-                      "relative inline-flex min-w-0 items-center justify-center gap-2 px-2 text-sm font-medium outline-none transition-colors focus-visible:bg-primary/[0.055] sm:px-5",
+                      "relative inline-flex h-full min-w-11 items-center justify-center gap-2 px-3 text-sm font-medium outline-none transition-colors duration-200 focus-visible:bg-primary/5 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-4",
                       isActive
-                        ? "text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary sm:after:inset-x-5"
+                        ? "text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -79,7 +79,7 @@ export function AppSidebar() {
               })}
             </nav>
           )}
-          <ThemeToggle />
+          <ThemeToggle className={isLandingPage ? undefined : "h-11 w-11"} />
         </div>
       </div>
     </header>

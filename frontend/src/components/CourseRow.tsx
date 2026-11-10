@@ -36,9 +36,9 @@ export function CourseRow({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="glass-panel overflow-hidden rounded-xl transition-all duration-200 hover:border-primary/35 hover:shadow-[0_14px_30px_hsl(var(--background)/0.6)]">
+      <div className="panel overflow-hidden transition-colors duration-200 hover:border-primary/35">
         <CollapsibleTrigger asChild>
-          <button className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-accent/45 transition-colors">
+          <button className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
             <div className="flex items-center gap-4 flex-1 min-w-0">
               <div
                 className="h-3 w-3 rounded-full shrink-0 ring-4 ring-background/60"
@@ -145,6 +145,7 @@ export function CourseRow({
               disabled={isAdded}
               size="sm"
               variant={isAdded ? "secondary" : "default"}
+              className="rounded-full"
             >
               {isAdded ? (
                 <>

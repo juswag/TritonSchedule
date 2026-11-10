@@ -8,13 +8,17 @@ import { getCourseCode } from "@/lib/courseLabels";
 import { eventsOverlap } from "@/lib/scheduleConflicts";
 import { getExamSchedule } from "@/lib/examSchedule";
 import ExamSchedule from "@/components/ExamSchedule";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconButton } from "@/components/ui/icon-button";
+import { Notice } from "@/components/ui/notice";
+import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const HOUR_HEIGHT = 64;
 const GRID_TOP_GUTTER = 16;
 const START_HOUR = 7;
 const END_HOUR = 22;
-const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, index) => START_HOUR + index);
 const WEEK_DAYS: Array<{ key: Weekday; label: string; shortLabel: string }> = [
   { key: "Mon", label: "Monday", shortLabel: "Mon" },
   { key: "Tue", label: "Tuesday", shortLabel: "Tue" },
@@ -28,11 +32,11 @@ function parseTime(time: string): number {
   return hours + minutes / 60;
 }
 
-function getEventStyle(event: CalendarEvent, columnCount: number, column: number) {
+function getEventStyle(event: CalendarEvent, columnCount: number, column: number, startHour: number) {
   const startTime = parseTime(event.startTime);
   const endTime = parseTime(event.endTime);
   const duration = endTime - startTime;
-  const top = GRID_TOP_GUTTER + (startTime - START_HOUR) * HOUR_HEIGHT;
+  const top = GRID_TOP_GUTTER + (startTime - startHour) * HOUR_HEIGHT;
   const height = Math.max(duration * HOUR_HEIGHT, 34);
   const width = `${100 / columnCount}%`;
   const left = `${(column * 100) / columnCount}%`;
@@ -40,7 +44,19 @@ function getEventStyle(event: CalendarEvent, columnCount: number, column: number
   return { top, height, width, left };
 }
 
-function layoutDay(events: CalendarEvent[]) {
+function visibleHours(events: CalendarEvent[]) {
+  let start = START_HOUR;
+  let end = END_HOUR;
+  for (const event of events) {
+    start = Math.min(start, Math.floor(parseTime(event.startTime)));
+    end = Math.max(end, Math.ceil(parseTime(event.endTime)));
+  }
+  start = Math.max(0, start);
+  end = Math.min(24, Math.max(end, start + 1));
+  return { startHour: start, hours: Array.from({ length: end - start }, (_, index) => start + index) };
+}
+
+function layoutDay(events: CalendarEvent[], startHour: number) {
   const ordered = [...events].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
   const groups: { columnEnds: number[]; items: { event: CalendarEvent; column: number }[] }[] = [];
   for (const event of ordered) {
@@ -56,7 +72,7 @@ function layoutDay(events: CalendarEvent[]) {
     group.items.push({ event, column });
   }
   return groups.flatMap(({ columnEnds, items }) => items.map(({ event, column }) => ({
-    event, style: getEventStyle(event, columnEnds.length, column),
+    event, style: getEventStyle(event, columnEnds.length, column, startHour),
   })));
 }
 
@@ -119,37 +135,36 @@ export default function CalendarPage() {
     () => events.filter((event) => event.dayOfWeek === selectedMobileDay).sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime)),
     [events, selectedMobileDay]
   );
+  const { startHour, hours } = useMemo(() => visibleHours(events), [events]);
+  const selectedDay = WEEK_DAYS.find((day) => day.key === selectedMobileDay);
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-[#fcfdff] dark:bg-background px-4 py-6 sm:px-7">
+    <div className="min-h-[calc(100vh-72px)] bg-background px-4 py-6 sm:px-7">
       <div className="mx-auto w-full max-w-[1440px]">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-[-0.025em] text-foreground">Your schedule</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {activeTab === "weekly" ? "Monday through Friday" : "Exams for your selected courses"}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">
-              {courseCount} {courseCount === 1 ? "course" : "courses"}
-            </span>
-            <Link
-              to="/courses"
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              <Plus className="h-4 w-4" />
-              Add course
-            </Link>
-          </div>
-        </div>
+        <PageHeader
+          title="Your schedule"
+          description={activeTab === "weekly" ? "Monday through Friday" : "Exams for your selected courses"}
+          actions={
+            <>
+              <span className="text-sm text-muted-foreground">
+                {courseCount} {courseCount === 1 ? "course" : "courses"}
+              </span>
+              <Button asChild className="h-11 rounded-full px-4">
+                <Link to="/courses">
+                  <Plus className="h-4 w-4" />
+                  Add course
+                </Link>
+              </Button>
+            </>
+          }
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList aria-label="Schedule views" className="mb-6 h-auto w-full justify-start gap-2 rounded-none border-b border-border bg-transparent p-0">
-            <TabsTrigger value="weekly" className="rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
+            <TabsTrigger value="weekly" className="min-h-11 rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
               Weekly classes
             </TabsTrigger>
-            <TabsTrigger value="exams" className="gap-2 rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
+            <TabsTrigger value="exams" className="min-h-11 gap-2 rounded-none border-b-2 border-transparent px-3 py-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">
               Exams
               {examSchedule.conflicts.length > 0 && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">
@@ -161,17 +176,18 @@ export default function CalendarPage() {
           </TabsList>
           <TabsContent value="weekly" className="mt-0">
             {weeklyConflicts.length > 0 && (
-              <section aria-label="Weekly schedule conflicts" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                <h2 className="flex items-center gap-2 font-semibold">
-                  <ConflictMarker />
-                  Weekly schedule conflict{weeklyConflicts.length > 1 ? "s" : ""}
-                </h2>
+              <Notice
+                aria-label="Weekly schedule conflicts"
+                className="mb-4"
+                icon={<ConflictMarker />}
+                title={`Weekly schedule conflict${weeklyConflicts.length > 1 ? "s" : ""}`}
+              >
                 <ul className="mt-1 space-y-1">
                   {weeklyConflicts.map(([key, message]) => <li key={key}>{message}</li>)}
                 </ul>
-              </section>
+              </Notice>
             )}
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="panel overflow-hidden">
           <div className="sm:hidden">
             <div className="grid grid-cols-5 border-b border-border">
               {WEEK_DAYS.map((day) => (
@@ -179,8 +195,9 @@ export default function CalendarPage() {
                   key={day.key}
                   type="button"
                   onClick={() => setSelectedMobileDay(day.key)}
+                  aria-pressed={selectedMobileDay === day.key}
                   className={cn(
-                    "relative px-1 py-3 text-xs font-medium transition-colors",
+                    "relative min-h-11 cursor-pointer px-1 py-3 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                     selectedMobileDay === day.key
                       ? "bg-primary/[0.055] text-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-primary"
                       : "text-muted-foreground"
@@ -192,10 +209,10 @@ export default function CalendarPage() {
             </div>
 
             {mobileEvents.length === 0 ? (
-              <div className="px-5 py-14 text-center">
-                <p className="text-sm font-semibold text-foreground">No classes on {selectedMobileDay}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Choose another day or add a course.</p>
-              </div>
+              <EmptyState
+                title={`No classes on ${selectedDay?.label ?? selectedMobileDay}`}
+                description="Choose another day or add a course."
+              />
             ) : (
               <div className="divide-y divide-border">
                 {mobileEvents.map((event) => (
@@ -218,14 +235,9 @@ export default function CalendarPage() {
                         </p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeEvent(event)}
-                      className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      aria-label={`Remove ${event.title}`}
-                    >
+                    <IconButton label={`Remove ${event.title}`} tone="danger" onClick={() => removeEvent(event)}>
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </IconButton>
                   </div>
                 ))}
               </div>
@@ -245,13 +257,13 @@ export default function CalendarPage() {
 
               <div
                 className="grid min-w-[760px] grid-cols-[64px_repeat(5,minmax(130px,1fr))]"
-                style={{ height: `${GRID_TOP_GUTTER + HOURS.length * HOUR_HEIGHT}px` }}
+                style={{ height: `${GRID_TOP_GUTTER + hours.length * HOUR_HEIGHT}px` }}
               >
                 <div className="relative border-r border-border bg-card">
-                  {HOURS.map((hour, index) => (
+                  {hours.map((hour, index) => (
                     <span
                       key={hour}
-                      className="absolute right-2 -translate-y-1/2 bg-card px-1 text-[10px] font-medium leading-none text-muted-foreground"
+                      className="absolute right-2 -translate-y-1/2 bg-card px-1 text-xs font-medium leading-none text-muted-foreground"
                       style={{ top: `${GRID_TOP_GUTTER + index * HOUR_HEIGHT}px` }}
                     >
                       {formatHour(hour)}
@@ -263,7 +275,7 @@ export default function CalendarPage() {
                   const dayEvents = events.filter((event) => event.dayOfWeek === day.key);
                   return (
                     <div key={day.key} className="relative border-r border-border last:border-r-0">
-                      {HOURS.map((hour, index) => (
+                      {hours.map((hour, index) => (
                         <div
                           key={hour}
                           className="absolute inset-x-0 border-t border-border/75"
@@ -271,7 +283,7 @@ export default function CalendarPage() {
                         />
                       ))}
 
-                      {layoutDay(dayEvents).map(({ event, style }) => {
+                      {layoutDay(dayEvents, startHour).map(({ event, style }) => {
                         const hasConflict = conflictingIds.has(event.id);
                         const blockTitle = meetingLabel(event);
                         return (
@@ -316,7 +328,7 @@ export default function CalendarPage() {
                               <button
                                 type="button"
                                 onClick={() => removeEvent(event)}
-                                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-card/95 text-muted-foreground opacity-0 shadow-sm transition hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+                                className="schedule-remove absolute right-1 top-1 flex items-center justify-center rounded-full bg-card text-muted-foreground shadow-sm transition-opacity duration-200 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 aria-label={`Remove ${event.title}`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />

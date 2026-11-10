@@ -42,6 +42,11 @@
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 24% 88%;
     --sidebar-ring: 216 92% 52%;
+
+    --navy: 218 55% 18%;
+    --gold: 36 70% 34%;
+    --gold-foreground: 40 80% 96%;
+    --gold-soft: 40 78% 92%;
   }
 
   .dark {
@@ -72,6 +77,11 @@
     --sidebar-accent-foreground: 0 0% 96%;
     --sidebar-border: 0 0% 20%;
     --sidebar-ring: 213 94% 68%;
+
+    --navy: 210 40% 92%;
+    --gold: 40 65% 70%;
+    --gold-foreground: 36 40% 12%;
+    --gold-soft: 36 28% 18%;
   }
 
   * {
@@ -112,7 +122,47 @@
 }
 
 .page-transition {
-  animation: page-fade-in 160ms ease-out;
+  animation: page-fade-in 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
+.font-display {
+  font-family: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
+}
+
+.panel {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px hsl(222 47% 11% / 0.04);
+}
+
+/* Dense calendar blocks hide removal until hover on a fine pointer.
+   Touch screens keep the control visible, because they have no hover. */
+.schedule-remove {
+  width: 2.75rem;
+  height: 2.75rem;
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .schedule-remove {
+    width: 2rem;
+    height: 2rem;
+    opacity: 0;
+  }
+
+  .group:hover .schedule-remove,
+  .group:focus-within .schedule-remove,
+  .schedule-remove:focus-visible {
+    opacity: 1;
+  }
 }
 
 .glass-panel {
