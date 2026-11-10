@@ -155,3 +155,15 @@
     display: block;
   }
 }
+
+/* Keep a container scrollable without the thick native scrollbar. */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

@@ -356,6 +356,17 @@ describe("course search selection and recovery", () => {
     expect(await screen.findByRole("button", { name: "Add section" })).toBeEnabled();
     expect(screen.getByRole("textbox", { name: "Search courses" })).toHaveValue("CSE 11");
   });
+
+  it("gives the course details panel even horizontal padding and hides its scrollbar", async () => {
+    renderSearch();
+    const panel = await screen.findByRole("complementary", { name: "Selected course details" });
+    const scroll = panel.querySelector("[data-details-scroll]");
+    const actions = panel.querySelector("[data-details-actions]");
+    expect(scroll).toHaveClass("scrollbar-hidden", "overflow-y-auto", "px-5", "sm:px-7", "lg:px-8");
+    expect(actions).toHaveClass("px-5", "sm:px-7", "lg:px-8");
+    expect(panel.className).not.toMatch(/\bpx-5\b/);
+    expect(panel.querySelector("dl")).toHaveClass("mt-5", "pb-5");
+  });
 });
 
 describe("courses with published exams but no weekly meetings", () => {

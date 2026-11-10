@@ -593,7 +593,7 @@ export default function SearchCourses() {
 
         <aside
           className={cn(
-            "min-w-0 overflow-hidden bg-[#fefefe] dark:bg-background px-5 py-7 sm:px-7 lg:px-8",
+            "min-w-0 overflow-hidden bg-[#fefefe] dark:bg-background py-7",
             isMobileDetailsOpen
               ? "fixed inset-x-0 bottom-0 top-[72px] z-40 xl:sticky xl:top-[72px] xl:z-auto xl:block xl:h-[calc(100vh-72px)] xl:self-start"
               : "hidden xl:sticky xl:top-[72px] xl:block xl:h-[calc(100vh-72px)] xl:self-start"
@@ -601,17 +601,21 @@ export default function SearchCourses() {
           aria-label="Selected course details"
         >
           {selectedCourse ? (
-            <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[520px] flex-col">
+            <div className="relative flex h-full min-h-0 w-full flex-col">
               <button
                 type="button"
                 onClick={() => setIsMobileDetailsOpen(false)}
-                className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground xl:hidden"
+                className="absolute right-5 top-0 z-10 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-7 lg:right-8 xl:hidden"
                 aria-label="Close course details"
               >
                 <X className="h-5 w-5" />
               </button>
-              <div className="min-h-0 flex-1 overflow-y-auto pb-5">
-                <div>
+              <div
+                data-details-scroll
+                className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-7 lg:px-8"
+              >
+                <div className="mx-auto w-full max-w-[520px]">
+                  <div>
                   <p className="pr-12 text-sm font-semibold text-primary">
                     {getCourseCode(selectedCourse.name)}
                   </p>
@@ -621,7 +625,7 @@ export default function SearchCourses() {
                   <EnrollmentSummary enrollment={selectedCourse.enrollment} fallback="Enrollment not listed" />
                 </div>
 
-                <dl className="mt-6 space-y-3.5 border-b border-border pb-6 text-sm">
+                <dl className="mt-5 space-y-3.5 border-b border-border pb-5 text-sm">
                   <DetailRow icon={UserRound} label="Instructor" value={selectedCourse.instructor} />
                   <DetailRow icon={Clock3} label="Time" value={formatCourseScheduleDisplay(selectedCourse)} />
                   <DetailRow icon={MapPin} label="Location" value={formatCourseLocations(selectedCourse)} />
@@ -707,9 +711,14 @@ export default function SearchCourses() {
                     conflictingCandidateEventIds={conflictingCandidateEventIds}
                   />
                 </section>
+                </div>
               </div>
 
-              <div className="-mx-5 shrink-0 border-t border-border bg-[#fefefe] dark:bg-background px-5 pb-6 pt-4 sm:-mx-7 sm:px-7 lg:-mx-8 lg:px-8 xl:mx-0 xl:px-0 xl:pb-0">
+              <div
+                data-details-actions
+                className="shrink-0 border-t border-border bg-[#fefefe] dark:bg-background px-5 pb-6 pt-4 sm:px-7 lg:px-8 xl:pb-0"
+              >
+                <div className="mx-auto w-full max-w-[520px]">
                 {conflictingScheduledEvents.length > 0 && (
                   <div role="status" id="selection-conflict-warning" className="mb-3 flex gap-2 rounded-md border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40 px-3 py-2.5 text-xs leading-5 text-rose-800 dark:text-rose-200">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -762,10 +771,11 @@ export default function SearchCourses() {
                         : "Add section"}
                   </button>
                 </div>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="mx-auto flex min-h-[420px] max-w-sm flex-col items-center justify-center text-center">
+            <div className="mx-auto flex min-h-[420px] max-w-sm flex-col items-center justify-center px-5 text-center sm:px-7 lg:px-8">
               <CalendarDays className="h-6 w-6 text-muted-foreground" />
               <h2 className="mt-4 text-base font-semibold text-foreground">Choose a section</h2>
             </div>
