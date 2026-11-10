@@ -16,9 +16,15 @@ import {
   CircleMinus,
   X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { Notice } from "@/components/ui/notice";
+import { PageHeader } from "@/components/ui/page-header";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSearchParams } from "react-router-dom";
+import { useNarrowViewport } from "@/hooks/use-narrow-viewport";
 import { Course, CourseExamSection, DiscussionSection, Enrollment } from "@/data/sampleCourses";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
@@ -136,7 +142,7 @@ function readCachedSearch(query: string): CachedSearch | null {
 }
 
 export default function SearchCourses() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() =>
     searchParams.get("q") ?? sessionStorage.getItem("searchCoursesQuery") ?? ""
   );
@@ -152,11 +158,36 @@ export default function SearchCourses() {
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
   const [selectedLabIds, setSelectedLabIds] = useState<Record<string, string>>({});
+  const [searchAttempt, setSearchAttempt] = useState(0);
+  const isNarrow = useNarrowViewport();
   const { events, examOnlyCourses, addEvent, addExamOnlyCourse, deleteEventsByCourseId } = useCalendar();
 
   useEffect(() => {
     sessionStorage.setItem("searchCoursesQuery", searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const current = searchParams.get("q") ?? "";
+    if (current === searchQuery) return;
+    const next = new URLSearchParams(searchParams);
+    if (searchQuery) next.set("q", searchQuery);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  }, [searchQuery, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!isMobileDetailsOpen || !isNarrow) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileDetailsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobileDetailsOpen, isNarrow]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -264,7 +295,7 @@ export default function SearchCourses() {
     return () => {
       controller.abort();
     };
-  }, [debouncedSearchQuery, activeTerm]);
+  }, [debouncedSearchQuery, activeTerm, searchAttempt]);
 
   const displayedCourses = coursesFromBackend;
   const isDebouncingSearch =
@@ -422,20 +453,17 @@ export default function SearchCourses() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-card">
+    <div className="min-h-[calc(100vh-72px)] bg-background">
       <div className="grid min-h-[calc(100vh-72px)] xl:grid-cols-[minmax(0,1.55fr)_minmax(390px,0.95fr)]">
         <section className="min-w-0 px-4 pb-8 pt-9 sm:px-8 xl:border-r xl:border-border">
           <div className="mx-auto w-full max-w-[880px]">
-            <div className="relative mb-6 pr-0 sm:pr-28">
-              <h1 className="text-[42px] font-extrabold leading-none tracking-[-0.05em] text-foreground sm:text-[52px]">
-                Find your{" "}
-                <span className="inline-block rounded-xl bg-[#eaf2ff] dark:bg-accent px-2.5 pb-1.5 pt-1">
-                  classes.
-                </span>
-              </h1>
-              <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-                Search the catalog and plan your quarter.
-              </p>
+            <div className="relative mb-6 sm:pr-28">
+              <PageHeader
+                className="mb-0"
+                title="Find your"
+                highlight="classes."
+                description="Search the catalog and plan your quarter."
+              />
               <img
                 src="/illustrations/trident-doodle.png"
                 alt=""
@@ -453,20 +481,19 @@ export default function SearchCourses() {
                   setSearchQuery(event.target.value);
                   setIsMobileDetailsOpen(false);
                 }}
-                className="h-16 rounded-lg border-border bg-card pl-12 pr-12 text-base shadow-none placeholder:text-muted-foreground/80 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+                className="h-14 rounded-xl border-border bg-card pl-12 pr-14 text-base shadow-none placeholder:text-muted-foreground/80"
               />
               {searchQuery && (
-                <button
-                  type="button"
+                <IconButton
+                  label="Clear search"
                   onClick={() => {
                     setSearchQuery("");
                     setIsMobileDetailsOpen(false);
                   }}
-                  className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label="Clear search"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </IconButton>
               )}
             </div>
 
@@ -483,7 +510,7 @@ export default function SearchCourses() {
               {activeTerm && <p className="ml-auto text-xs font-medium text-muted-foreground">{formatTerm(activeTerm)}</p>}
             </div>
 
-            <div className="mt-4 overflow-hidden border-y border-border">
+            <div className="panel mt-4 overflow-hidden">
               {displayedCourses.length > 0 && !isBackendLoading && !isDebouncingSearch && (
                 <div className="hidden grid-cols-[1.25fr_1.15fr_1.15fr_.65fr] gap-5 border-b border-border px-5 py-4 text-xs font-medium text-muted-foreground md:grid">
                   <span>Class</span>
@@ -494,22 +521,25 @@ export default function SearchCourses() {
               )}
 
               {isBackendLoading || isDebouncingSearch ? (
-                <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="flex min-h-44 items-center justify-center gap-3 text-sm text-muted-foreground" role="status">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   Searching
                 </div>
               ) : searchState === "error" ? (
-                <SearchState
+                <EmptyState
+                  icon={Search}
                   title="Search unavailable"
-                  description="Try again shortly."
+                  description="The catalog did not respond. Try the same search again."
+                  action={
+                    <Button type="button" variant="outline" className="h-11 rounded-full px-5" onClick={() => setSearchAttempt((attempt) => attempt + 1)}>
+                      Try again
+                    </Button>
+                  }
                 />
               ) : searchQuery.trim().length === 0 ? (
-                <SearchState title="Search courses" />
+                <EmptyState icon={Search} title="Search courses" />
               ) : displayedCourses.length === 0 ? (
-                <SearchState
-                  title="No results"
-                  description="Try another search."
-                />
+                <EmptyState icon={Search} title="No results" description="Try another search." />
               ) : (
                 <div className="divide-y divide-border">
                   {displayedCourses.map((course) => {
@@ -529,7 +559,7 @@ export default function SearchCourses() {
                             setSelectedCourseId(course.id);
                             setIsMobileDetailsOpen(true);
                           }}
-                          className="absolute inset-0 z-0 w-full cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                          className="absolute inset-0 z-0 w-full cursor-pointer transition-colors duration-200 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                           aria-label={`Select ${course.name} with ${course.instructor}`}
                           aria-pressed={isSelected}
                         />
@@ -544,7 +574,7 @@ export default function SearchCourses() {
                             href={getProfessorProfileUrl(course.rmpProfileUrl, course.instructor)}
                             target="_blank"
                             rel="noreferrer"
-                            className="pointer-events-auto inline-flex h-5 w-fit items-center gap-1.5 rounded-sm text-xs transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                            className="pointer-events-auto inline-flex h-5 w-fit items-center gap-1.5 rounded-md text-xs transition-colors duration-200 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             aria-label={`View ${course.instructor} on Rate My Professors`}
                           >
                             {course.rmpRating && (
@@ -593,29 +623,30 @@ export default function SearchCourses() {
 
         <aside
           className={cn(
-            "min-w-0 overflow-hidden bg-[#fefefe] dark:bg-background px-5 py-7 sm:px-7 lg:px-8",
+            "min-w-0 overflow-hidden bg-card px-5 py-7 sm:px-7 lg:px-8",
             isMobileDetailsOpen
-              ? "fixed inset-x-0 bottom-0 top-[72px] z-40 xl:sticky xl:top-[72px] xl:z-auto xl:block xl:h-[calc(100vh-72px)] xl:self-start"
-              : "hidden xl:sticky xl:top-[72px] xl:block xl:h-[calc(100vh-72px)] xl:self-start"
+              ? "fixed inset-x-0 bottom-0 top-[72px] z-40 xl:sticky xl:top-[72px] xl:z-auto xl:block xl:h-[calc(100vh-72px)] xl:self-start xl:border-l xl:border-border"
+              : "hidden xl:sticky xl:top-[72px] xl:block xl:h-[calc(100vh-72px)] xl:self-start xl:border-l xl:border-border"
           )}
+          role={isNarrow && isMobileDetailsOpen ? "dialog" : undefined}
+          aria-modal={isNarrow && isMobileDetailsOpen ? true : undefined}
           aria-label="Selected course details"
         >
           {selectedCourse ? (
             <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[520px] flex-col">
-              <button
-                type="button"
+              <IconButton
+                label="Close course details"
                 onClick={() => setIsMobileDetailsOpen(false)}
-                className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground xl:hidden"
-                aria-label="Close course details"
+                className="absolute right-0 top-0 xl:hidden"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </IconButton>
               <div className="min-h-0 flex-1 overflow-y-auto pb-5">
                 <div>
                   <p className="pr-12 text-sm font-semibold text-primary">
                     {getCourseCode(selectedCourse.name)}
                   </p>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-foreground">
+                  <h2 className="font-display mt-1 text-4xl tracking-[-0.03em] text-foreground">
                     {getCourseTitle(selectedCourse.name)}
                   </h2>
                   <EnrollmentSummary enrollment={selectedCourse.enrollment} fallback="Enrollment not listed" />
@@ -654,7 +685,7 @@ export default function SearchCourses() {
                       href={getProfessorProfileUrl(selectedCourse.rmpProfileUrl, selectedCourse.instructor)}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-label="Open Rate My Professors"
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -709,35 +740,27 @@ export default function SearchCourses() {
                 </section>
               </div>
 
-              <div className="-mx-5 shrink-0 border-t border-border bg-[#fefefe] dark:bg-background px-5 pb-6 pt-4 sm:-mx-7 sm:px-7 lg:-mx-8 lg:px-8 xl:mx-0 xl:px-0 xl:pb-0">
+              <div className="-mx-5 shrink-0 border-t border-border bg-card px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:-mx-7 sm:px-7 lg:-mx-8 lg:px-8 xl:mx-0 xl:px-0 xl:pb-0">
                 {conflictingScheduledEvents.length > 0 && (
-                  <div role="status" id="selection-conflict-warning" className="mb-3 flex gap-2 rounded-md border border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/40 px-3 py-2.5 text-xs leading-5 text-rose-800 dark:text-rose-200">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <Notice id="selection-conflict-warning" role="status" tone="danger" className="mb-3" icon={<AlertTriangle className="h-4 w-4" aria-hidden="true" />}>
                     <p>{formatConflictMessage(conflictingScheduledEvents)}</p>
-                  </div>
+                  </Notice>
                 )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {selectedTssUrl ? (
-                    <a
-                      href={selectedTssUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-border bg-card px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Open in TSS
-                    </a>
+                    <Button asChild variant="outline" className="h-12 rounded-full">
+                      <a href={selectedTssUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4" />
+                        Open in TSS
+                      </a>
+                    </Button>
                   ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-border bg-muted px-5 text-sm font-semibold text-muted-foreground"
-                    >
+                    <Button type="button" variant="outline" disabled className="h-12 rounded-full">
                       <ExternalLink className="h-4 w-4" />
                       TSS link unavailable
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
                     type="button"
                     aria-describedby={conflictingScheduledEvents.length ? "selection-conflict-warning" : undefined}
                     disabled={
@@ -753,37 +776,22 @@ export default function SearchCourses() {
                         selectedLab
                       )
                     }
-                    className="h-12 w-full rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                    className="h-12 rounded-full"
                   >
                     {addedCourseIds.has(selectedCourse.id)
                       ? "Remove from schedule"
                       : conflictingScheduledEvents.length > 0
                         ? "Add with conflict"
                         : "Add section"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="mx-auto flex min-h-[420px] max-w-sm flex-col items-center justify-center text-center">
-              <CalendarDays className="h-6 w-6 text-muted-foreground" />
-              <h2 className="mt-4 text-base font-semibold text-foreground">Choose a section</h2>
-            </div>
+            <EmptyState icon={CalendarDays} title="Choose a section" className="min-h-[420px]" />
           )}
         </aside>
       </div>
-    </div>
-  );
-}
-
-function SearchState({ title, description }: { title: string; description?: string }) {
-  return (
-    <div className="flex min-h-44 flex-col items-center justify-center px-6 text-center">
-      <Search className="h-5 w-5 text-muted-foreground" />
-      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
-      {description && (
-        <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
-      )}
     </div>
   );
 }
@@ -871,7 +879,7 @@ function SectionPicker({
               role="combobox"
               aria-expanded={isOpen}
               aria-label={`Choose ${label.toLowerCase()} section`}
-              className="mt-2 flex min-h-16 w-full items-center gap-3 rounded-md border border-border bg-card px-3.5 py-2.5 text-left outline-none transition-colors hover:border-input hover:bg-muted/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+              className="mt-2 flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left outline-none transition-colors duration-200 hover:border-input hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-foreground">{selectedSection.name}</span>
@@ -893,7 +901,7 @@ function SectionPicker({
           <PopoverContent
             align="start"
             sideOffset={6}
-            className="w-[var(--radix-popover-trigger-width)] rounded-md border-border bg-card p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.12)]"
+            className="w-[var(--radix-popover-trigger-width)] rounded-xl border-border bg-card p-1.5 shadow-lg"
           >
             <div role="listbox" aria-label={`${label} sections`} className="max-h-72 space-y-1 overflow-y-auto">
               {sections.map((section) => {
@@ -909,7 +917,7 @@ function SectionPicker({
                       setIsOpen(false);
                     }}
                     className={cn(
-                      "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted",
+                      "flex w-full cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors duration-200 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                       isSelected && "bg-primary/[0.055] dark:bg-accent"
                     )}
                   >
@@ -938,12 +946,12 @@ function SectionPicker({
           </PopoverContent>
         </Popover>
       ) : totalCount > 0 ? (
-        <div className="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 px-3 py-3 text-sm text-amber-900 dark:text-amber-200">
+        <div className="mt-2 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>No {label.toLowerCase()} sections have a usable time that fits the selected course meetings.</span>
         </div>
       ) : (
-        <p className="mt-2 rounded-md border border-border bg-card px-3 py-3 text-sm text-muted-foreground">
+        <p className="mt-2 rounded-xl border border-border bg-card px-3 py-3 text-sm text-muted-foreground">
           No {label.toLowerCase()} required
         </p>
       )}
@@ -986,11 +994,11 @@ function CourseSchedulePreview({
   ];
 
   return (
-    <div className="mt-4 overflow-hidden rounded-md border border-border bg-card">
+    <div className="panel mt-4 overflow-hidden">
       <div className="grid grid-cols-[38px_repeat(5,minmax(0,1fr))] border-b border-border bg-muted/35">
         <div />
         {PREVIEW_DAYS.map((day) => (
-          <div key={day} className="border-l border-border px-1 py-2 text-center text-[10px] font-semibold text-muted-foreground">
+          <div key={day} className="border-l border-border px-1 py-2 text-center text-xs font-semibold text-muted-foreground">
             {day}
           </div>
         ))}
@@ -1000,7 +1008,7 @@ function CourseSchedulePreview({
           {hours.map((hour) => (
             <span
               key={hour}
-              className="absolute right-1.5 -translate-y-1/2 text-[9px] font-medium text-muted-foreground"
+              className="absolute right-1 -translate-y-1/2 text-[11px] font-medium text-muted-foreground"
               style={{ top: `${((hour * 60 - startMinutes) / (endMinutes - startMinutes)) * 100}%` }}
             >
               {hour > 12 ? `${hour - 12} PM` : hour === 12 ? "12 PM" : `${hour} AM`}
@@ -1069,7 +1077,7 @@ function PreviewBlock({
   return (
     <div
       className={cn(
-        "absolute z-10 flex flex-col justify-center overflow-hidden rounded-[4px] border px-1 text-[9px] font-semibold leading-3 [container-type:size]",
+        "absolute z-10 flex flex-col justify-center overflow-hidden rounded-md border px-1 text-[11px] font-semibold leading-4 [container-type:size]",
         conflicting && tone === "existing" && "left-1 right-[51%] border-rose-300 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300",
         conflicting && tone !== "existing" && "left-[51%] right-1 border-rose-500 bg-rose-100 dark:border-rose-400 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200",
         !conflicting && "inset-x-1",
@@ -1267,6 +1275,10 @@ function parseCourseSchedule(schedule: string): { days: Weekday[]; startTime: st
   };
 }
 
+function oppositePeriod(period: string): string {
+  return period.toUpperCase().startsWith("P") ? "AM" : "PM";
+}
+
 function extractTimeRange(schedule: string): { start: string; end: string } | null {
   const match = schedule.match(
     /(\d{1,2}:\d{2})\s*([AaPp][Mm]?|[AaPp])?\s*-\s*(\d{1,2}:\d{2})\s*([AaPp][Mm]?|[AaPp])?/i
@@ -1277,18 +1289,32 @@ function extractTimeRange(schedule: string): { start: string; end: string } | nu
   }
 
   const [, startBase, startPeriodRaw, endBase, endPeriodRaw] = match;
-  const inferredPeriod = endPeriodRaw ?? startPeriodRaw;
-  const startPeriod = startPeriodRaw ?? inferredPeriod;
+  const startPeriod = startPeriodRaw ?? endPeriodRaw;
   const endPeriod = endPeriodRaw ?? startPeriodRaw;
 
   if (!startPeriod || !endPeriod) {
     return null;
   }
 
-  return {
-    start: convertTo24Hour(`${startBase} ${startPeriod}`),
-    end: convertTo24Hour(`${endBase} ${endPeriod}`),
-  };
+  let start = convertTo24Hour(`${startBase} ${startPeriod}`);
+  let end = convertTo24Hour(`${endBase} ${endPeriod}`);
+
+  // A catalog time often prints the meridiem once. Copying it onto both ends
+  // turns "11:00-12:20p" into 11 PM–12:20 PM. If that range runs backwards,
+  // the missing end is the other half of the day.
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    if (!startPeriodRaw && endPeriodRaw) {
+      start = convertTo24Hour(`${startBase} ${oppositePeriod(endPeriodRaw)}`);
+    } else if (startPeriodRaw && !endPeriodRaw) {
+      end = convertTo24Hour(`${endBase} ${oppositePeriod(startPeriodRaw)}`);
+    }
+  }
+
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    return null;
+  }
+
+  return { start, end };
 }
 
 function extractWeekdays(schedule: string): Weekday[] {

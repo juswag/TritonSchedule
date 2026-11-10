@@ -1,7 +1,10 @@
 import { type CSSProperties, Fragment, useId } from "react";
-import { AlertTriangle, Trash2, X } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import type { CalendarCourse } from "@/types/calendar";
 import type { ExamConflict, ScheduledExam } from "@/lib/examSchedule";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconButton } from "@/components/ui/icon-button";
+import { Notice } from "@/components/ui/notice";
 
 type ExamScheduleProps = {
   exams: ScheduledExam[];
@@ -18,9 +21,11 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
 
   if (courseCount === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card px-5 py-14 text-center">
-        <p className="text-sm font-semibold text-foreground">Add courses to see their exam details</p>
-        <p className="mt-1 text-sm text-muted-foreground">Your selected courses’ midterms and finals will appear here.</p>
+      <div className="panel">
+        <EmptyState
+          title="Add courses to see their exam details"
+          description="Your selected courses’ midterms and finals will appear here."
+        />
       </div>
     );
   }
@@ -28,33 +33,35 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
   return (
     <div className="space-y-8">
       {examOnlyCourses.length > 0 && (
-        <ul aria-label="Courses without weekly meetings" className="divide-y divide-border rounded-lg border border-border bg-card">
+        <ul aria-label="Courses without weekly meetings" className="panel divide-y divide-border">
           {examOnlyCourses.map((course) => (
             <li key={course.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
               <div className="min-w-0">
                 <p className="course-label font-medium" style={{ "--course-color": course.color } as CSSProperties}>{course.title}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">No weekly meetings</p>
               </div>
-              <button type="button" onClick={() => onRemoveCourse?.(course.id)} aria-label={`Remove ${course.title}`} className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+              <IconButton label={`Remove ${course.title}`} tone="danger" onClick={() => onRemoveCourse?.(course.id)}>
                 <Trash2 aria-hidden="true" className="h-4 w-4" />
-              </button>
+              </IconButton>
             </li>
           ))}
         </ul>
       )}
       {missingCourses.length > 0 && (
-        <p className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-          Exam details weren’t saved for {missingCourses.map((course) => course.title).join(", ")}.
-          {" "}Remove and re-add these courses to load their exams.
-        </p>
+        <Notice>
+          <p>
+            Exam details weren’t saved for {missingCourses.map((course) => course.title).join(", ")}.
+            {" "}Remove and re-add these courses to load their exams.
+          </p>
+        </Notice>
       )}
       {(["midterm", "final"] as const).map((type) => {
         const sectionExams = exams.filter((exam) => exam.type === type);
         const title = type === "midterm" ? "Midterms" : "Finals";
         return (
           <section key={type} aria-labelledby={`${id}-${type}`}>
-            <h2 id={`${id}-${type}`} className="mb-3 text-xl font-semibold tracking-tight text-foreground">{title}</h2>
-            <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <h2 id={`${id}-${type}`} className="font-display mb-3 text-3xl tracking-tight text-foreground">{title}</h2>
+            <div className="panel overflow-hidden">
               {sectionExams.length === 0 ? (
                 <p className="px-5 py-8 text-sm text-muted-foreground">No {type} details available.</p>
               ) : (
@@ -103,15 +110,14 @@ export default function ExamSchedule({ exams, conflicts, missingCourses, courseC
                               <div className="flex items-center justify-between gap-2">
                                 <span><span className="md:hidden">Location: </span>{exam.location || "TBD"}</span>
                                 {onRemoveCourse && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onRemoveCourse(exam.courseId)}
-                                    aria-label={`Remove ${exam.courseTitle} from schedule`}
+                                  <IconButton
+                                    label={`Remove ${exam.courseTitle} from schedule`}
                                     title="Remove course from schedule"
-                                    className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    tone="danger"
+                                    onClick={() => onRemoveCourse(exam.courseId)}
                                   >
-                                    <X aria-hidden="true" className="h-4 w-4" />
-                                  </button>
+                                    <Trash2 aria-hidden="true" className="h-4 w-4" />
+                                  </IconButton>
                                 )}
                               </div>
                             </td>
