@@ -116,7 +116,8 @@
 }
 
 .landing-display {
-  font-family: "Space Grotesk", Inter, ui-sans-serif, sans-serif;
+  font-family: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
 }
 
 .glass-panel {
