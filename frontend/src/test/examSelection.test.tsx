@@ -7,6 +7,7 @@ import SearchCourses from "@/pages/SearchCourses";
 import Index from "@/pages/Index";
 import CalendarPage from "@/pages/CalendarPage";
 import type { CalendarEvent } from "@/types/calendar";
+import { professorRatingTones } from "@/lib/professorRating";
 
 const course = {
   id: "exam-integration-cse11",
@@ -300,25 +301,26 @@ describe("course search selection and recovery", () => {
     expect(screen.queryByRole("region", { name: "Weekly schedule conflicts" })).toBeNull();
   });
 
-  it.each([[4.8, "Excellent", "emerald"], [4, "Very good", "emerald"], [3.6, "Good", "orange"], [3, "Good", "orange"], [2.9, "Mixed", "red"]])("shows verified professor details with rating %s", async (rating, label, color) => {
+  it.each([[4.8, "Excellent", "high"], [4, "Very good", "high"], [3.6, "Good", "mid"], [3, "Good", "mid"], [2.9, "Mixed", "low"]] as const)("shows verified professor details with rating %s", async (rating, label, tier) => {
     mockCatalog([{ ...course, rmp: { avgRating: rating, avgDiff: 3, takeAgainPercent: 90, profileUrl: "https://www.ratemyprofessors.com/professor/123" }, TssFallbackUrl: "https://tss.ucsd.edu/fiori#YSchedule-view&/YUCSD_CON_MODULE(AcademicYear='2026',AcademicPeriod='FA',ModuleID='123')?layout=MidColumnFullScreen" }]);
     renderSearch();
     expect(await screen.findByText(label)).toBeVisible();
     const profile = screen.getByRole("link", { name: /on Rate My Professors/ });
-    expect(profile.querySelector("svg.lucide-star")).toHaveClass("fill-current", `text-${color}-600`, `dark:text-${color}-400`);
+    expect(profile.querySelector("svg.lucide-star")).toHaveAttribute("data-rating-tier", tier);
+    expect(profile.querySelector("svg.lucide-star")).toHaveClass("fill-current", ...professorRatingTones[tier].icon.split(" "));
     expect(screen.getByText(/90% would take again/)).toBeVisible();
     expect(screen.getByRole("link", { name: "Open in TSS" })).toHaveAttribute("href", expect.stringContaining("tss.ucsd.edu"));
   });
 
   it.each([
-    { rating: 2.96, displayed: "3.0", color: "orange" },
-    { rating: 3.96, displayed: "4.0", color: "emerald" },
-  ])("colors the star for $rating using the displayed score $displayed", async ({ rating, displayed, color }) => {
+    { rating: 2.96, displayed: "3.0", tier: "mid" as const },
+    { rating: 3.96, displayed: "4.0", tier: "high" as const },
+  ])("colors the star for $rating using the displayed score $displayed", async ({ rating, displayed, tier }) => {
     mockCatalog([{ ...course, rmp: { avgRating: rating } }]);
     renderSearch();
     const profile = await screen.findByRole("link", { name: /on Rate My Professors/ });
     expect(within(profile).getByText(displayed)).toBeVisible();
-    expect(profile.querySelector("svg.lucide-star")).toHaveClass(`text-${color}-600`, `dark:text-${color}-400`);
+    expect(profile.querySelector("svg.lucide-star")).toHaveAttribute("data-rating-tier", tier);
   });
 
   it("switches between course results before adding", async () => {
