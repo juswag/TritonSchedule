@@ -281,6 +281,12 @@ export function buildLegacySections(
 ): Section[] {
   return sections.flatMap((section) => {
     const metadata = {
+      Enrollment: {
+        enrolled: section.enrolled,
+        capacity: section.capacity,
+        seatsAvailable: section.seats_available,
+        waitlisted: section.waitlist_enrolled,
+      },
       SectionId: section.section_id,
       SectionRef: section.section_ref,
       SectionCode: section.section_code,

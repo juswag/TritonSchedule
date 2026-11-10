@@ -110,6 +110,27 @@ function savedEvents(): CalendarEvent[] {
 }
 
 describe("course search selection and recovery", () => {
+  it("shows enrollment for the primary section and the chosen discussion", async () => {
+    mockCatalog([{ ...course,
+      Lecture: { ...course.Lecture, Enrollment: { enrolled: 90, capacity: 100, seatsAvailable: 10, waitlisted: 0 } },
+      Discussions: [
+        { ...course.Discussions[0], Enrollment: { enrolled: 30, capacity: 30, seatsAvailable: 0, waitlisted: 2 } },
+        { ...course.Discussions[1], Enrollment: { enrolled: 0, capacity: null, seatsAvailable: null, waitlisted: null } },
+      ],
+    }]);
+    renderSearch();
+    expect(await screen.findByText("90 of 100 enrolled")).toBeVisible();
+    expect(screen.getByText("0 waitlisted")).toBeVisible();
+    expect(screen.getAllByText("10 open seats")).toHaveLength(2);
+    const discussion = screen.getByRole("combobox", { name: "Choose discussion section" });
+    expect(discussion).toHaveTextContent("No open seats");
+    expect(discussion).toHaveTextContent("30 of 30 enrolled");
+    expect(discussion).toHaveTextContent("2 waitlisted");
+    fireEvent.click(discussion);
+    fireEvent.click(await screen.findByRole("option", { name: /A02/ }));
+    expect(discussion).toHaveTextContent("0 enrolled");
+  });
+
   it.each([400, 404, 200])("shows no results for an empty catalog response (%s)", async (status) => {
     mockCatalog({}, status);
     renderSearch();

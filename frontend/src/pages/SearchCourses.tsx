@@ -11,13 +11,14 @@ import {
   Search,
   Star,
   UserRound,
-  UsersRound,
+  CircleCheck,
+  CircleMinus,
   X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSearchParams } from "react-router-dom";
-import { Course, CourseExamSection, DiscussionSection } from "@/data/sampleCourses";
+import { Course, CourseExamSection, DiscussionSection, Enrollment } from "@/data/sampleCourses";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
 import { getCourseCode } from "@/lib/courseLabels";
@@ -520,13 +521,10 @@ export default function SearchCourses() {
                           aria-label={`Select ${course.name} with ${course.instructor}`}
                           aria-pressed={isSelected}
                         />
-                        <span className="pointer-events-none relative z-[1] grid min-w-0 grid-rows-[1.75rem_1.25rem] content-center gap-2">
-                          <span className="flex items-center truncate text-sm font-semibold text-foreground">
-                            {getCourseCode(course.name)}
-                          </span>
-                          <span className="flex items-center truncate text-xs text-foreground/70">
-                            {getCourseTitle(course.name)}
-                          </span>
+                        <span className="pointer-events-none relative z-[1] flex min-w-0 flex-col items-start gap-1.5">
+                          <span className="text-sm font-semibold text-foreground">{getCourseCode(course.name)}</span>
+                          <span className="max-w-full truncate text-xs text-foreground/70">{getCourseTitle(course.name)}</span>
+                          {course.enrollment?.seatsAvailable != null && <SeatStatus seats={course.enrollment.seatsAvailable} />}
                         </span>
                         <span className="pointer-events-none relative z-[1] grid min-w-0 grid-rows-[1.75rem_1.25rem] content-center gap-2 text-sm text-foreground/80">
                           <span className="flex items-center truncate">{course.instructor}</span>
@@ -608,13 +606,13 @@ export default function SearchCourses() {
                   <h2 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-foreground">
                     {getCourseTitle(selectedCourse.name)}
                   </h2>
+                  <EnrollmentSummary enrollment={selectedCourse.enrollment} fallback="Enrollment not listed" />
                 </div>
 
                 <dl className="mt-6 space-y-3.5 border-b border-border pb-6 text-sm">
                   <DetailRow icon={UserRound} label="Instructor" value={selectedCourse.instructor} />
                   <DetailRow icon={Clock3} label="Time" value={formatCourseScheduleDisplay(selectedCourse)} />
                   <DetailRow icon={MapPin} label="Location" value={formatCourseLocations(selectedCourse)} />
-                  <DetailRow icon={UsersRound} label="Enrollment" value="Not listed" />
                 </dl>
 
                 <section className="border-b border-border py-5">
@@ -775,6 +773,40 @@ function SearchState({ title, description }: { title: string; description?: stri
   );
 }
 
+function SeatStatus({ seats }: { seats: number }) {
+  const open = seats > 0;
+  const Icon = open ? CircleCheck : CircleMinus;
+  return (
+    <span className={cn("inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold tabular-nums", open
+      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+      : "bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200")}>
+      <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+      {open ? `${seats} open ${seats === 1 ? "seat" : "seats"}` : "No open seats"}
+    </span>
+  );
+}
+
+function EnrollmentSummary({ enrollment, compact = false, fallback }: {
+  enrollment?: Enrollment;
+  compact?: boolean;
+  fallback?: string;
+}) {
+  if (!enrollment || Object.values(enrollment).every(value => value == null)) return fallback ? <span className="mt-2 block text-sm text-muted-foreground">{fallback}</span> : null;
+  const { enrolled, capacity, seatsAvailable, waitlisted } = enrollment;
+  const details = [];
+  if (enrolled != null && capacity != null) details.push(`${enrolled} of ${capacity} enrolled`);
+  else if (enrolled != null) details.push(`${enrolled} enrolled`);
+  else if (capacity != null) details.push(`${capacity} total seats`);
+  if (waitlisted != null) details.push(`${waitlisted} waitlisted`);
+
+  return (
+    <span className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground", compact ? "mt-2" : "mt-3")}>
+      {seatsAvailable != null && <SeatStatus seats={seatsAvailable} />}
+      {details.map(detail => <span key={detail}>{detail}</span>)}
+    </span>
+  );
+}
+
 function DetailRow({
   icon: Icon,
   label,
@@ -782,7 +814,7 @@ function DetailRow({
 }: {
   icon: typeof UserRound;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
     <div className="grid grid-cols-[20px_96px_minmax(0,1fr)] items-start gap-3">
@@ -838,6 +870,7 @@ function SectionPicker({
                     <span className="truncate">{selectedSection.location}</span>
                   </span>
                 </span>
+                <EnrollmentSummary enrollment={selectedSection.enrollment} compact />
               </span>
               <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
             </button>
@@ -878,6 +911,7 @@ function SectionPicker({
                           <span className="truncate">{section.location}</span>
                         </span>
                       </span>
+                      <EnrollmentSummary enrollment={section.enrollment} compact />
                     </span>
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                       {isSelected && <Check className="h-4 w-4 text-primary" />}
@@ -1412,6 +1446,7 @@ async function searchBackendCourses(query: string, signal: AbortSignal, term: st
 }
 
 type BackendSection = {
+  Enrollment?: Enrollment;
   Days?: string;
   Time?: string;
   Location?: string;
@@ -1503,6 +1538,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
     schedule: lectureSchedule || "Schedule TBA",
     description: `Term: ${term}`,
     color: "hsl(210, 70%, 52%)",
+    enrollment: lecture?.Enrollment ?? lectures[0]?.Enrollment,
     lectureLocation: lecture?.Location?.trim() || "TBA",
     lectureMeetings: lectures.map((meeting, meetingIndex) => ({
       id: `${course.id ?? index}-lecture-${meetingIndex}`,
@@ -1535,6 +1571,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       name: section.SectionCode ?? `Discussion ${sectionIndex + 1}`,
       time: `${section.Days ?? ""} ${section.Time ?? ""}`.trim() || "TBA",
       location: section.Location?.trim() || "TBA",
+      enrollment: section.Enrollment,
       sectionRef: section.SectionRef,
       sectionCode: section.SectionCode,
       eventPackageIds: section.EventPackageIds,
@@ -1545,6 +1582,7 @@ function mapBackendCourseToCourse(course: BackendCourse, index: number): Course 
       name: section.SectionCode ?? `Lab ${sectionIndex + 1}`,
       time: `${section.Days ?? ""} ${section.Time ?? ""}`.trim() || "TBA",
       location: section.Location?.trim() || "TBA",
+      enrollment: section.Enrollment,
       sectionRef: section.SectionRef,
       sectionCode: section.SectionCode,
       eventPackageIds: section.EventPackageIds,
