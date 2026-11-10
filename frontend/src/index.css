@@ -144,3 +144,14 @@
 .dark .course-label {
   color: color-mix(in srgb, var(--course-color) 45%, white);
 }
+
+.preview-block-time {
+  display: none;
+}
+
+/* Two 12px lines fit inside the meeting block's content box. */
+@container (min-height: 24px) {
+  .preview-block-time {
+    display: block;
+  }
+}

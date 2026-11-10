@@ -1020,7 +1020,7 @@ function PreviewBlock({
   return (
     <div
       className={cn(
-        "absolute z-10 overflow-hidden rounded-[4px] border px-1 py-1 text-[9px] font-semibold leading-tight",
+        "absolute z-10 flex flex-col justify-center overflow-hidden rounded-[4px] border px-1 text-[9px] font-semibold leading-3 [container-type:size]",
         conflicting && tone === "existing" && "left-1 right-[51%] border-rose-300 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300",
         conflicting && tone !== "existing" && "left-[51%] right-1 border-rose-500 bg-rose-100 dark:border-rose-400 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200",
         !conflicting && "inset-x-1",
@@ -1032,7 +1032,7 @@ function PreviewBlock({
       title={`${label}, ${formatClockTime(startTime)}-${formatClockTime(endTime)}${conflicting ? ", conflict" : ""}`}
     >
       <span className="block truncate">{label}</span>
-      <span className="mt-0.5 block truncate font-normal opacity-85">{formatClockTime(startTime)}</span>
+      <span className="preview-block-time truncate font-normal opacity-85">{formatClockTime(startTime)}</span>
     </div>
   );
 }
@@ -1123,6 +1123,11 @@ function sectionScheduleToEvents(
 }
 
 function getPreviewLabel(event: CalendarEvent): string {
+  if (event.eventType === "Discussion") {
+    const courseTitle = event.courseTitle ?? event.title.replace(/\s+\([^()]+\)$/, "");
+    return getCourseCode(courseTitle);
+  }
+
   const sectionName = event.title.match(/\(([^)]+)\)/)?.[1];
   return sectionName ?? getCourseCode(event.title);
 }
