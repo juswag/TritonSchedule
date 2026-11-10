@@ -254,6 +254,17 @@ describe("course search selection and recovery", () => {
     expect(screen.getByRole("link", { name: "Open in TSS" })).toHaveAttribute("href", expect.stringContaining("tss.ucsd.edu"));
   });
 
+  it.each([
+    { rating: 2.96, displayed: "3.0", color: "orange" },
+    { rating: 3.96, displayed: "4.0", color: "emerald" },
+  ])("colors the star for $rating using the displayed score $displayed", async ({ rating, displayed, color }) => {
+    mockCatalog([{ ...course, rmp: { avgRating: rating } }]);
+    renderSearch();
+    const profile = await screen.findByRole("link", { name: /on Rate My Professors/ });
+    expect(within(profile).getByText(displayed)).toBeVisible();
+    expect(profile.querySelector("svg.lucide-star")).toHaveClass(`text-${color}-600`, `dark:text-${color}-400`);
+  });
+
   it("switches between course results before adding", async () => {
     mockCatalog([course, { ...course, id: "physics", Name: "PHYS 2A - Mechanics", Lecture: { Days: "Monday Thursday", Time: "2:00 PM - 3:00 PM" }, Lectures: [{ Days: "Monday", Time: "2:00 PM - 3:00 PM" }, { Days: "Thursday", Time: "4:00 PM - 5:00 PM", Location: "LAB" }], Discussions: [] }]);
     renderSearch();
