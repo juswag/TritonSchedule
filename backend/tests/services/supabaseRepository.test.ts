@@ -25,6 +25,31 @@ const classMeeting = {
 };
 
 describe("mapOfferingToCourse", () => {
+  it("keeps manual rooms on matching meetings and retains authenticated booking links", () => {
+    const course = classPlannerCourse();
+    const section = course.sections[0]!;
+    const publicMeeting = { ...classMeeting, building_code: null, building_name: null, room_code: null, room_name: null };
+    const [result] = mapOfferingToCourses({
+      ...course, id: 1, source_key: "updated-section-list", instructors_search: "",
+      class_planner_sections: [{
+        ...section, id: 99,
+        tss_event_packages: [{ event_package_id: "new-public-id", tss_booking_url: null }, { event_package_id: "current", tss_booking_url: null }],
+        manual_details: {
+          rooms: [classMeeting], packages: [{ event_package_id: "removed", tss_booking_url: "stale" }, { event_package_id: "current", tss_booking_url: "booking" }],
+          route: { route_kind: "module", tss_url: "module" },
+        },
+        class_planner_section_meetings: [
+          { ...publicMeeting, day_code: "F", meeting_ordinal: 0 },
+          { ...publicMeeting, meeting_ordinal: 1 },
+        ],
+      }],
+    });
+    expect(result!.Lectures!.map(({ Location }) => Location)).toEqual(["TBA", "CENTR 101"]);
+    expect(result!.Lecture!.EventPackageIds).toEqual(["new-public-id", "current"]);
+    expect(result!.TssPackageUrls).toEqual({ current: "booking" });
+    expect(result!.TssFallbackUrl).toBe("module");
+  });
+
   it("preserves public catalog meetings and package membership without booking routes or rooms", () => {
     const course = classPlannerCourse(100);
     const publicMeeting = {
@@ -193,19 +218,22 @@ describe("mapOfferingToCourse", () => {
         ...course.sections[0]!,
         id: 1,
         tss_event_packages: [],
-        class_planner_section_meetings: [classMeeting, ...["CENTR 101", "CENTR 115"].map((room, index) => ({
-          ...classMeeting,
-          meeting_ordinal: index + 1,
-          meeting_kind: "final",
-          specific_date: "2026-12-07",
-          room_code: room,
+        manual_details: {
+          packages: [], route: null,
+          rooms: [classMeeting, ...["CENTR", "WLH"].map((building_code) => ({
+            ...classMeeting, meeting_kind: "final", specific_date: "2026-12-07", building_code, room_code: "101",
+          }))],
+        },
+        class_planner_section_meetings: [classMeeting, ...[1, 2].map((meeting_ordinal) => ({
+          ...classMeeting, meeting_ordinal, meeting_kind: "final", specific_date: "2026-12-07",
+          building_code: null, room_code: null, building_name: null, room_name: null,
         }))],
       }],
     });
 
     expect(result?.Lecture?.Exams).toEqual([
       { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 101", Type: "final" },
-      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "CENTR 115", Type: "final" },
+      { Days: "2026-12-07", Time: "5:00pm-6:20pm", Location: "WLH 101", Type: "final" },
     ]);
   });
 
@@ -350,6 +378,7 @@ describe("mapOfferingToCourse", () => {
       Teacher: "Ada Lovelace",
       SectionCode: "001-000-LE",
       Lecture: {
+        Enrollment: { enrolled: 90, capacity: 100, seatsAvailable: 10, waitlisted: 0 },
         Days: "Tue",
         Time: "5:00pm-6:20pm",
         Location: "CENTR 101",

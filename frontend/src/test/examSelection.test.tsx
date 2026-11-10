@@ -145,6 +145,27 @@ describe("course search selection and recovery", () => {
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining("course=CSE%2011&term=WI27"), expect.anything());
   });
 
+  it("shows enrollment for the primary section and the chosen discussion", async () => {
+    mockCatalog([{ ...course,
+      Lecture: { ...course.Lecture, Enrollment: { enrolled: 90, capacity: 100, seatsAvailable: 10, waitlisted: 0 } },
+      Discussions: [
+        { ...course.Discussions[0], Enrollment: { enrolled: 30, capacity: 30, seatsAvailable: 0, waitlisted: 2 } },
+        { ...course.Discussions[1], Enrollment: { enrolled: 0, capacity: null, seatsAvailable: null, waitlisted: null } },
+      ],
+    }]);
+    renderSearch();
+    expect(await screen.findByText("90 of 100 enrolled")).toBeVisible();
+    expect(screen.getByText("0 waitlisted")).toBeVisible();
+    expect(screen.getAllByText("10 open seats")).toHaveLength(2);
+    const discussion = screen.getByRole("combobox", { name: "Choose discussion section" });
+    expect(discussion).toHaveTextContent("No open seats");
+    expect(discussion).toHaveTextContent("30 of 30 enrolled");
+    expect(discussion).toHaveTextContent("2 waitlisted");
+    fireEvent.click(discussion);
+    fireEvent.click(await screen.findByRole("option", { name: /A02/ }));
+    expect(discussion).toHaveTextContent("0 enrolled");
+  });
+
   it.each([400, 404, 200])("shows no results for an empty catalog response (%s)", async (status) => {
     mockCatalog({}, status);
     renderSearch();
@@ -279,12 +300,25 @@ describe("course search selection and recovery", () => {
     expect(screen.queryByRole("region", { name: "Weekly schedule conflicts" })).toBeNull();
   });
 
-  it.each([[4.8, "Excellent"], [4.2, "Very good"], [3.4, "Good"], [2.5, "Mixed"]])("shows verified professor details with rating %s", async (rating, label) => {
+  it.each([[4.8, "Excellent", "emerald"], [4, "Very good", "emerald"], [3.6, "Good", "orange"], [3, "Good", "orange"], [2.9, "Mixed", "red"]])("shows verified professor details with rating %s", async (rating, label, color) => {
     mockCatalog([{ ...course, rmp: { avgRating: rating, avgDiff: 3, takeAgainPercent: 90, profileUrl: "https://www.ratemyprofessors.com/professor/123" }, TssFallbackUrl: "https://tss.ucsd.edu/fiori#YSchedule-view&/YUCSD_CON_MODULE(AcademicYear='2026',AcademicPeriod='FA',ModuleID='123')?layout=MidColumnFullScreen" }]);
     renderSearch();
     expect(await screen.findByText(label)).toBeVisible();
+    const profile = screen.getByRole("link", { name: /on Rate My Professors/ });
+    expect(profile.querySelector("svg.lucide-star")).toHaveClass("fill-current", `text-${color}-600`, `dark:text-${color}-400`);
     expect(screen.getByText(/90% would take again/)).toBeVisible();
     expect(screen.getByRole("link", { name: "Open in TSS" })).toHaveAttribute("href", expect.stringContaining("tss.ucsd.edu"));
+  });
+
+  it.each([
+    { rating: 2.96, displayed: "3.0", color: "orange" },
+    { rating: 3.96, displayed: "4.0", color: "emerald" },
+  ])("colors the star for $rating using the displayed score $displayed", async ({ rating, displayed, color }) => {
+    mockCatalog([{ ...course, rmp: { avgRating: rating } }]);
+    renderSearch();
+    const profile = await screen.findByRole("link", { name: /on Rate My Professors/ });
+    expect(within(profile).getByText(displayed)).toBeVisible();
+    expect(profile.querySelector("svg.lucide-star")).toHaveClass(`text-${color}-600`, `dark:text-${color}-400`);
   });
 
   it("switches between course results before adding", async () => {

@@ -9,6 +9,7 @@
     "dev": "tsx watch src/server.ts",
     "prebuild": "npm run clean",
     "build": "tsc --project tsconfig.build.json",
+    "ingest:details": "tsx src/ingestion/importClassPlannerDetails.ts",
     "ingest": "tsx src/ingestion/runCatalogIngestion.ts",
     "start": "node dist/server.js",
     "lint": "eslint . --ext .ts",
