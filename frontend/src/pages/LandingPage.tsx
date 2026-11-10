@@ -1,3 +1,4 @@
+import { ProfessorRatingStar } from "@/components/ProfessorRatingStar";
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -12,7 +13,6 @@ import {
   MapPin,
   MessageCircle,
   Search,
-  Star,
   Trash2,
 } from "lucide-react";
 
@@ -144,7 +144,7 @@ export default function LandingPage() {
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-muted-foreground sm:text-sm">
                       <span>{course.professor}</span>
                       <span className="inline-flex items-center gap-1 text-slate-700 dark:text-foreground/80">
-                        <Star className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600 dark:fill-emerald-400 dark:text-emerald-400" />
+                        <ProfessorRatingStar rating={Number(course.rating)} className="h-3.5 w-3.5" />
                         {course.rating}
                       </span>
                       <span>•</span>
@@ -407,7 +407,7 @@ function MiniSectionRow({
       <span className="pr-3 leading-[1.35]">{time}</span>
       <span className="whitespace-nowrap">{professor}</span>
       <span className="inline-flex items-center gap-1 whitespace-nowrap">
-        <Star className="h-3 w-3 fill-emerald-600 text-emerald-600 dark:fill-emerald-400 dark:text-emerald-400" />
+        <ProfessorRatingStar rating={Number(rating)} className="h-3 w-3" />
         {rating}
       </span>
     </div>
