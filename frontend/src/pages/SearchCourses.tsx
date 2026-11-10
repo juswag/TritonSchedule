@@ -110,42 +110,42 @@ function createApiRequestInit(signal: AbortSignal): RequestInit {
   };
 }
 
+const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
+
+type CachedSearch = {
+  query: string;
+  term: string;
+  results: Course[];
+  searchState: "success" | "not_found";
+};
+
+function readCachedSearch(query: string): CachedSearch | null {
+  if (!query) return null;
+  try {
+    const stored = sessionStorage.getItem(SEARCH_RESULTS_CACHE_KEY);
+    const cache = stored ? JSON.parse(stored) : null;
+    return cache?.query === query && typeof cache.term === "string" &&
+      Array.isArray(cache.results) &&
+      cache.searchState === (cache.results.length ? "success" : "not_found")
+      ? cache : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function SearchCourses() {
-  const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
   const [searchParams] = useSearchParams();
-  const initialQuery = searchParams.get("q") ?? sessionStorage.getItem("searchCoursesQuery") ?? "";
   const [searchQuery, setSearchQuery] = useState(() =>
-    initialQuery
+    searchParams.get("q") ?? sessionStorage.getItem("searchCoursesQuery") ?? ""
   );
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() =>
-    initialQuery
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  const [initialCache] = useState(() => readCachedSearch(searchQuery.trim()));
+  const [coursesFromBackend, setCoursesFromBackend] = useState<Course[]>(initialCache?.results ?? []);
+  const [isBackendLoading, setIsBackendLoading] = useState(Boolean(searchQuery.trim() && !initialCache));
+  const [searchState, setSearchState] = useState<"idle" | "loading" | "success" | "not_found" | "error">(
+    initialCache?.searchState ?? "idle"
   );
-  const [coursesFromBackend, setCoursesFromBackend] = useState<Course[]>(() => {
-    const stored = sessionStorage.getItem(SEARCH_RESULTS_CACHE_KEY);
-    if (!stored) return [];
-
-    try {
-      const parsed = JSON.parse(stored) as { results?: Course[] };
-      return Array.isArray(parsed.results) ? parsed.results : [];
-    } catch {
-      return [];
-    }
-  });
-  const [isBackendLoading, setIsBackendLoading] = useState(false);
-  const [searchState, setSearchState] = useState<"idle" | "loading" | "success" | "not_found" | "error">(() => {
-    const stored = sessionStorage.getItem(SEARCH_RESULTS_CACHE_KEY);
-    if (!stored) return "idle";
-
-    try {
-      const parsed = JSON.parse(stored) as { searchState?: string };
-      return parsed.searchState === "success" || parsed.searchState === "not_found"
-        ? parsed.searchState
-        : "idle";
-    } catch {
-      return "idle";
-    }
-  });
-  const [activeTerm, setActiveTerm] = useState<string>("");
+  const [activeTerm, setActiveTerm] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
@@ -163,6 +163,7 @@ export default function SearchCourses() {
       try {
         const response = await fetchApi("/term", createApiRequestInit(controller.signal));
         if (!response.ok) {
+          setActiveTerm("");
           return;
         }
 
@@ -175,8 +176,8 @@ export default function SearchCourses() {
             ? payload.Term
             : payload.Term?.Term;
 
-        if (typeof resolvedTerm === "string") {
-          setActiveTerm(resolvedTerm);
+        if (!controller.signal.aborted) {
+          setActiveTerm(typeof resolvedTerm === "string" ? resolvedTerm.trim() : "");
         }
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
@@ -204,11 +205,20 @@ export default function SearchCourses() {
 
   useEffect(() => {
     const query = debouncedSearchQuery.trim();
-    const normalizedTerm = activeTerm.trim();
 
     if (!query) {
       setCoursesFromBackend([]);
       setSearchState("idle");
+      setIsBackendLoading(false);
+      return;
+    }
+
+    if (activeTerm === null) return;
+
+    const cached = readCachedSearch(query);
+    if (cached && cached.term === activeTerm) {
+      setCoursesFromBackend(cached.results);
+      setSearchState(cached.searchState);
       setIsBackendLoading(false);
       return;
     }
@@ -221,6 +231,7 @@ export default function SearchCourses() {
       setCoursesFromBackend([]);
       try {
         const backendCourses = await searchBackendCourses(query, controller.signal, activeTerm);
+        if (controller.signal.aborted) return;
         const mappedCourses = backendCourses.map(mapBackendCourseToCourse);
         setCoursesFromBackend(mappedCourses);
         const resolvedSearchState = mappedCourses.length > 0 ? "success" : "not_found";
@@ -229,7 +240,7 @@ export default function SearchCourses() {
           SEARCH_RESULTS_CACHE_KEY,
           JSON.stringify({
             query,
-            term: normalizedTerm,
+            term: activeTerm,
             results: mappedCourses,
             searchState: resolvedSearchState,
           })

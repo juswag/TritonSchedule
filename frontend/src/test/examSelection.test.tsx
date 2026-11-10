@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { MemoryRouter } from "react-router-dom";
 import { CalendarProvider } from "@/context/CalendarContext";
 import SearchCourses from "@/pages/SearchCourses";
+import Index from "@/pages/Index";
 import CalendarPage from "@/pages/CalendarPage";
 import type { CalendarEvent } from "@/types/calendar";
 
@@ -110,6 +111,30 @@ function savedEvents(): CalendarEvent[] {
 }
 
 describe("course search selection and recovery", () => {
+  it("restores the last search after visiting Schedule without another course request", async () => {
+    render(<MemoryRouter initialEntries={["/courses"]}><Index /></MemoryRouter>);
+    fireEvent.change(screen.getByRole("textbox", { name: "Search courses" }), { target: { value: "CSE 11" } });
+    await screen.findByRole("button", { name: /Select CSE 11/ });
+    fireEvent.click(screen.getByRole("link", { name: "Schedule" }));
+    expect(screen.queryByRole("textbox", { name: "Search courses" })).toBeNull();
+    fireEvent.click(screen.getByRole("link", { name: "Courses" }));
+    expect(screen.getByRole("textbox", { name: "Search courses" })).toHaveValue("CSE 11");
+    expect(screen.getByRole("button", { name: /Select CSE 11/ })).toBeVisible();
+    await screen.findByText("Fall 2026");
+    const requests = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
+    expect(requests).toHaveLength(1);
+  });
+
+  it("refreshes the saved query when the catalog term changes", async () => {
+    const first = renderSearch();
+    await screen.findByRole("button", { name: /Select CSE 11/ });
+    first.unmount();
+    mockCatalog([], 200, { Term: "WI27" });
+    renderSearch("/courses");
+    expect((await screen.findAllByText("No results"))[0]).toBeVisible();
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("course=CSE%2011&term=WI27"), expect.anything());
+  });
+
   it.each([400, 404, 200])("shows no results for an empty catalog response (%s)", async (status) => {
     mockCatalog({}, status);
     renderSearch();
