@@ -1171,14 +1171,14 @@ function sectionScheduleToEvents(
   }));
 }
 
+/**
+ * Every preview block is labeled with its course code (e.g. "CSE 110"). Section
+ * titles look like "CSE 110 - Software Eng (A50)", so pulling text out of the
+ * parentheses showed bare section codes instead of the class.
+ */
 function getPreviewLabel(event: CalendarEvent): string {
-  if (event.eventType === "Discussion") {
-    const courseTitle = event.courseTitle ?? event.title.replace(/\s+\([^()]+\)$/, "");
-    return getCourseCode(courseTitle);
-  }
-
-  const sectionName = event.title.match(/\(([^)]+)\)/)?.[1];
-  return sectionName ?? getCourseCode(event.title);
+  const courseTitle = event.courseTitle ?? event.title.replace(/\s+\([^()]+\)$/, "");
+  return getCourseCode(courseTitle);
 }
 
 function getPreviewRange(events: CalendarEvent[]): {

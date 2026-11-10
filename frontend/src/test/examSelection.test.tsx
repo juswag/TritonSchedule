@@ -301,6 +301,18 @@ describe("course search selection and recovery", () => {
     expect(screen.queryByRole("region", { name: "Weekly schedule conflicts" })).toBeNull();
   });
 
+  it("labels every weekly preview block with the course code, not the section code", async () => {
+    mockCatalog([{ ...course, Labs: [{ SectionCode: "L01", Days: "Thu", Time: "1:00 PM - 2:00 PM" }] }]);
+    renderSearch();
+    await screen.findByRole("heading", { name: "Weekly schedule preview" });
+    const blocks = Array.from(document.querySelectorAll<HTMLElement>("[title]")).filter((el) => el.querySelector(".preview-block-time"));
+    expect(blocks.length).toBeGreaterThanOrEqual(5);
+    for (const block of blocks) {
+      expect(block.firstElementChild?.textContent).toBe("CSE 11");
+      expect(block.getAttribute("title")).toMatch(/^CSE 11, /);
+    }
+  });
+
   it.each([[4.8, "Excellent", "high"], [4, "Very good", "high"], [3.6, "Good", "mid"], [3, "Good", "mid"], [2.9, "Mixed", "low"]] as const)("shows verified professor details with rating %s", async (rating, label, tier) => {
     mockCatalog([{ ...course, rmp: { avgRating: rating, avgDiff: 3, takeAgainPercent: 90, profileUrl: "https://www.ratemyprofessors.com/professor/123" }, TssFallbackUrl: "https://tss.ucsd.edu/fiori#YSchedule-view&/YUCSD_CON_MODULE(AcademicYear='2026',AcademicPeriod='FA',ModuleID='123')?layout=MidColumnFullScreen" }]);
     renderSearch();
