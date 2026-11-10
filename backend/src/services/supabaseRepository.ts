@@ -35,10 +35,22 @@ type TssModuleRouteRow = {
   tss_url: string;
 };
 
+type RoomDetail = Pick<ClassPlannerMeeting,
+  "meeting_kind" | "day_code" | "specific_date" | "start_minutes" | "end_minutes" |
+  "is_remote" | "building_code" | "building_name" | "room_code" | "room_name"
+>;
+
+type ManualSectionDetails = {
+  rooms: RoomDetail[];
+  packages: TssPackageRow[];
+  route: TssModuleRouteRow | null;
+};
+
 type SectionRow = Omit<ClassPlannerSection, "event_package_ids" | "meetings"> & {
   id: number;
   class_planner_section_meetings: MeetingRow[];
   tss_event_packages?: TssPackageRow[];
+  manual_details?: ManualSectionDetails | null;
 };
 
 type OfferingRow = Omit<ClassPlannerCourse, "sections"> & {
@@ -116,13 +128,43 @@ export function exactSubjectCodeFromSearch(value: string): string | null {
   return NORMALIZED_SUBJECT_CODES.has(normalizedValue) ? normalizedValue : null;
 }
 
+function applyManualDetails(section: SectionRow): SectionRow {
+  const details = section.manual_details;
+  if (!details) return section;
+
+  const packages = new Map<string, TssPackageRow>();
+  for (const { event_package_id } of section.tss_event_packages ?? []) {
+    packages.set(event_package_id, { event_package_id, tss_booking_url: null });
+  }
+  for (const pkg of details.packages) packages.set(pkg.event_package_id, pkg);
+
+  const meetings = section.class_planner_section_meetings.map((meeting) => {
+    const matches = details.rooms.filter((room) =>
+      room.meeting_kind === meeting.meeting_kind && room.day_code === meeting.day_code &&
+      room.specific_date === meeting.specific_date && room.start_minutes === meeting.start_minutes &&
+      room.end_minutes === meeting.end_minutes && room.is_remote === meeting.is_remote);
+    // No upstream meeting ID. A changed or ambiguous time slot needs a fresh room assignment.
+    const room = matches.length === 1 ? matches[0] : undefined;
+    return {
+      ...meeting,
+      building_code: room?.building_code ?? null,
+      building_name: room?.building_name ?? null,
+      room_code: room?.room_code ?? null,
+      room_name: room?.room_name ?? null,
+    };
+  });
+
+  return { ...section, class_planner_section_meetings: meetings, tss_event_packages: [...packages.values()] };
+}
+
 export function mapOfferingToCourses(
   row: OfferingRow,
   ratingsByNameKey: ReadonlyMap<string, RMP> = new Map(),
 ): Array<Course & { id: string }> {
+  const sections = row.class_planner_sections.map(applyManualDetails);
   const classPlannerCourse: ClassPlannerCourse = {
     ...row,
-    sections: row.class_planner_sections
+    sections: sections
       .map((section): ClassPlannerSection => ({
         ...section,
         event_package_ids: (section.tss_event_packages ?? [])
@@ -140,7 +182,7 @@ export function mapOfferingToCourses(
   const sectionChoices: Array<ClassPlannerSection | undefined> =
     primarySections.length > 0 ? primarySections : [undefined];
   const tssPackageUrls = Object.fromEntries(
-    row.class_planner_sections.flatMap((section) =>
+    sections.flatMap((section) =>
       (section.tss_event_packages ?? []).flatMap((eventPackage) =>
         eventPackage.tss_booking_url
           ? [[eventPackage.event_package_id, eventPackage.tss_booking_url] as const]
@@ -151,9 +193,7 @@ export function mapOfferingToCourses(
   const route = Array.isArray(row.tss_module_routes)
     ? row.tss_module_routes[0]
     : row.tss_module_routes;
-  const tssFallbackUrl = route?.route_kind === "module"
-    ? route.tss_url
-    : undefined;
+  const manualBySection = new Map(sections.map((s) => [s.section_id, s.manual_details]));
 
   return sectionChoices.map((primarySection) => {
     // Other primary sections and optional discussions can have different exams.
@@ -177,6 +217,8 @@ export function mapOfferingToCourses(
         )
       : tssPackageUrls;
 
+    const details = primarySection ? manualBySection.get(primarySection.section_id) : sections[0]?.manual_details;
+    const sectionRoute = details ? details.route : route;
     return {
       ...baseCourse,
       Midterms: sectionCourse.Midterms,
@@ -189,7 +231,7 @@ export function mapOfferingToCourses(
       nameKey,
       rmp: ratingsByNameKey.get(nameKey) ?? null,
       TssPackageUrls: relevantTssPackageUrls,
-      TssFallbackUrl: tssFallbackUrl,
+      TssFallbackUrl: sectionRoute?.route_kind === "module" ? sectionRoute.tss_url : undefined,
     };
   });
 }
@@ -271,6 +313,7 @@ export async function searchCourses(course: string, term: string) {
           waitlist_available,
           status,
           instructors,
+          manual_details (rooms, packages, route),
           tss_event_packages (
             event_package_id,
             tss_booking_url
@@ -376,6 +419,19 @@ export async function replaceCatalog(
   term: string,
   catalog: ClassPlannerCatalogSnapshot,
 ) {
+  return stageAndPublishCatalog(term, catalog, "finalize_class_planner_catalog_refresh");
+}
+
+/** Publishes only manually imported rooms and TSS data for the selected term. */
+export async function replaceManualCatalogDetails(term: string, catalog: ClassPlannerCatalogSnapshot) {
+  return stageAndPublishCatalog(term, catalog, "finalize_class_planner_manual_details");
+}
+
+async function stageAndPublishCatalog(
+  term: string,
+  catalog: ClassPlannerCatalogSnapshot,
+  finalize: "finalize_class_planner_catalog_refresh" | "finalize_class_planner_manual_details",
+) {
   if (catalog.offerings.length <= 0) {
     throw new Error("Refusing to replace catalog with no offerings");
   }
@@ -421,7 +477,7 @@ export async function replaceCatalog(
     }
 
     const { error: finalizeError } = await supabase.rpc(
-      "finalize_class_planner_catalog_refresh",
+      finalize,
       { p_refresh_id: refreshId },
     );
     throwIfError(finalizeError);

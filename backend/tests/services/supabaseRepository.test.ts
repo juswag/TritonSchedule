@@ -25,6 +25,31 @@ const classMeeting = {
 };
 
 describe("mapOfferingToCourse", () => {
+  it("keeps manual rooms on matching meetings and retains authenticated booking links", () => {
+    const course = classPlannerCourse();
+    const section = course.sections[0]!;
+    const publicMeeting = { ...classMeeting, building_code: null, building_name: null, room_code: null, room_name: null };
+    const [result] = mapOfferingToCourses({
+      ...course, id: 1, source_key: "updated-section-list", instructors_search: "",
+      class_planner_sections: [{
+        ...section, id: 99,
+        tss_event_packages: [{ event_package_id: "new-public-id", tss_booking_url: null }],
+        manual_details: {
+          rooms: [classMeeting], packages: [{ event_package_id: "manual-id", tss_booking_url: "booking" }],
+          route: { route_kind: "module", tss_url: "module" },
+        },
+        class_planner_section_meetings: [
+          { ...publicMeeting, day_code: "F", meeting_ordinal: 0 },
+          { ...publicMeeting, meeting_ordinal: 1 },
+        ],
+      }],
+    });
+    expect(result!.Lectures!.map(({ Location }) => Location)).toEqual(["TBA", "CENTR 101"]);
+    expect(result!.Lecture!.EventPackageIds).toEqual(["new-public-id", "manual-id"]);
+    expect(result!.TssPackageUrls).toEqual({ "manual-id": "booking" });
+    expect(result!.TssFallbackUrl).toBe("module");
+  });
+
   it("preserves public catalog meetings and package membership without booking routes or rooms", () => {
     const course = classPlannerCourse(100);
     const publicMeeting = {

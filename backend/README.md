@@ -102,6 +102,12 @@ If the school lookup fails or no professor request succeeds, the command exits u
 Each run writes counts, warnings, publication state, and the workflow URL to `private.catalog_ingestion_runs` through service-role-only functions.
 Starting a run rejects overlap with another active run, marks runs older than four hours as failed, and removes audit and completed or failed catalog-refresh records older than 90 days.
 
+### Manual room and booking import
+
+For a manual refresh, set `CLASS_PLANNER_SESSION_COOKIE` to a current signed-in Class Planner Cookie header. From the backend directory, run `npm run ingest:details -- WI27`. Add `--preview` to check counts before writing. Nightly ingestion uses the public API and cannot replace these separately stored details.
+
+Course search attaches these details by term, course, and section ID. Rooms also require a matching meeting kind, date, day, and time. A rescheduled meeting displays an unknown location until a new import matches it.
+
 ## Deployment
 
 Vercel uses `src/app.ts` directly as its Express entry point.

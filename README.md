@@ -13,3 +13,9 @@
 - Search the active UCSD Class Planner catalog by course, title, or instructor and compare lecture, discussion, and lab choices against the current schedule.
 - Open the selected section combination in TSS when Class Planner supplies an official route that TritonSchedule can validate.
 - Add course sections and custom events to a weekly calendar, with warnings for overlapping meetings.
+
+## Catalog locations and booking links
+
+Nightly ingestion uses the public Class Planner API for schedules, exams, seats, and available event-package IDs. Before a term's first enrollment window, run the [manual details import](backend/README.md#manual-room-and-booking-import) to add rooms and TSS booking links. Repeat it when assignments change. Public refreshes preserve the saved details for matching sections and meetings.
+
+Apply the Supabase migrations before deploying the course API or the manual importer.
