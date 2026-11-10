@@ -1,3 +1,4 @@
+import { ProfessorRatingStar } from "@/components/ProfessorRatingStar";
 import { useState, useMemo, useEffect } from "react";
 import {
   AlertTriangle,
@@ -9,7 +10,6 @@ import {
   Loader2,
   MapPin,
   Search,
-  Star,
   UserRound,
   UsersRound,
   X,
@@ -539,7 +539,7 @@ export default function SearchCourses() {
                           >
                             {course.rmpRating && (
                               <>
-                                <Star className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600 dark:fill-emerald-400 dark:text-emerald-400" aria-hidden="true" />
+                                <ProfessorRatingStar rating={course.rmpRating} className="h-3.5 w-3.5" />
                                 <span>{course.rmpRating.toFixed(1)}</span>
                                 <span className="text-muted-foreground" aria-hidden="true">·</span>
                               </>

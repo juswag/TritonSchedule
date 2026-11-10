@@ -244,10 +244,12 @@ describe("course search selection and recovery", () => {
     expect(screen.queryByRole("region", { name: "Weekly schedule conflicts" })).toBeNull();
   });
 
-  it.each([[4.8, "Excellent"], [4.2, "Very good"], [3.4, "Good"], [2.5, "Mixed"]])("shows verified professor details with rating %s", async (rating, label) => {
+  it.each([[4.8, "Excellent", "emerald"], [4, "Very good", "emerald"], [3.6, "Good", "orange"], [3, "Good", "orange"], [2.9, "Mixed", "red"]])("shows verified professor details with rating %s", async (rating, label, color) => {
     mockCatalog([{ ...course, rmp: { avgRating: rating, avgDiff: 3, takeAgainPercent: 90, profileUrl: "https://www.ratemyprofessors.com/professor/123" }, TssFallbackUrl: "https://tss.ucsd.edu/fiori#YSchedule-view&/YUCSD_CON_MODULE(AcademicYear='2026',AcademicPeriod='FA',ModuleID='123')?layout=MidColumnFullScreen" }]);
     renderSearch();
     expect(await screen.findByText(label)).toBeVisible();
+    const profile = screen.getByRole("link", { name: /on Rate My Professors/ });
+    expect(profile.querySelector("svg.lucide-star")).toHaveClass("fill-current", `text-${color}-600`, `dark:text-${color}-400`);
     expect(screen.getByText(/90% would take again/)).toBeVisible();
     expect(screen.getByRole("link", { name: "Open in TSS" })).toHaveAttribute("href", expect.stringContaining("tss.ucsd.edu"));
   });
