@@ -115,6 +115,10 @@
   animation: page-fade-in 160ms ease-out;
 }
 
+.landing-display {
+  font-family: "Space Grotesk", Inter, ui-sans-serif, sans-serif;
+}
+
 .glass-panel {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));

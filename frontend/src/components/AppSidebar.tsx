@@ -13,7 +13,7 @@ export function AppSidebar() {
   const isLandingPage = location.pathname === "/";
 
   return (
-    <header className="sticky top-0 z-50 bg-card">
+    <header className={cn("sticky top-0 z-50 bg-card", isLandingPage && "border-b border-border/80")}>
       <div className="flex h-[72px] w-full items-stretch justify-between px-4 sm:px-8">
         <NavLink
           to="/"
