@@ -1,4 +1,5 @@
 import { ProfessorRatingStar } from "@/components/ProfessorRatingStar";
+import { getProfessorRatingTier, getProfessorRatingTone } from "@/lib/professorRating";
 import { useState, useMemo, useEffect } from "react";
 import {
   AlertTriangle,
@@ -632,10 +633,13 @@ export default function SearchCourses() {
                       <h2 className="text-sm font-semibold text-foreground">Rate My Professor</h2>
                       {selectedCourse.rmpRating ? (
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                          <span className="rounded bg-emerald-600 px-2 py-1 font-semibold text-white dark:bg-emerald-700">
+                          <span
+                            data-rating-tier={getProfessorRatingTier(selectedCourse.rmpRating)}
+                            className={cn("rounded px-2 py-1 font-semibold", getProfessorRatingTone(selectedCourse.rmpRating).badge)}
+                          >
                             {selectedCourse.rmpRating.toFixed(1)}
                           </span>
-                          <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                          <span className={cn("font-medium", getProfessorRatingTone(selectedCourse.rmpRating).text)}>
                             {ratingLabel(selectedCourse.rmpRating)}
                           </span>
                           {selectedCourse.rmpTakeAgain !== undefined && (
