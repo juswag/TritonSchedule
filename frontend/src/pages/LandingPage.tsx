@@ -1,58 +1,56 @@
-import { ProfessorRatingStar } from "@/components/ProfessorRatingStar";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Github,
-  MapPin,
-  MessageCircle,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowRight, CheckCircle2, Github, MessageCircle, Search } from "lucide-react";
+import { ProfessorRatingStar } from "@/components/ProfessorRatingStar";
+import { cn } from "@/lib/utils";
 
-const previewCourses = [
-  {
-    code: "CSE 100",
-    title: "Advanced Data Structures",
-    professor: "Prof. Kim",
-    rating: "4.6",
-    units: "4 units",
-    open: "32 open",
-    time: "Tu Th 9:00 – 9:50 AM",
-    location: "Center Hall 2142",
-  },
-  {
-    code: "MATH 20C",
-    title: "Calculus for Scientists III",
-    professor: "Prof. Nguyen",
-    rating: "4.4",
-    units: "4 units",
-    open: "21 open",
-    time: "Mo We 10:00 – 11:20 AM",
-    location: "AP&M 2411",
-  },
-  {
-    code: "COGS 108",
-    title: "Cognition (Mind and Machine)",
-    professor: "Prof. Sims",
-    rating: "4.8",
-    units: "4 units",
-    open: "18 open",
-    time: "Mo We 11:00 – 12:15 PM",
-    location: "SSLH 100",
-  },
+const ease = [0.22, 1, 0.36, 1] as const;
+
+const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const hours = ["9 AM", "10 AM", "11 AM", "12 PM"];
+
+const mobileMeetings = [
+  { day: "Mon", code: "MATH 20C", time: "10:00 – 11:20 AM", place: "AP&M 2411", color: "#D97706", delay: 0.08 },
+  { day: "Tue", code: "CSE 100", time: "9:00 – 9:50 AM", place: "Center Hall 2142", color: "#2563EB", delay: 0.16 },
+  { day: "Wed", code: "MATH 20C", time: "10:00 – 11:20 AM", place: "AP&M 2411", color: "#D97706", delay: 0.24 },
+  { day: "Thu", code: "CSE 100", time: "9:00 – 9:50 AM", place: "Center Hall 2142", color: "#2563EB", delay: 0.32 },
 ];
 
-const scheduleHours = ["8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM"];
+const meetings = [
+  { id: "cse-tue", code: "CSE 100", time: "9:00 – 9:50", place: "Center Hall 2142", column: 2, row: 2, span: 1, color: "#2563EB", delay: 0.08 },
+  { id: "cse-thu", code: "CSE 100", time: "9:00 – 9:50", place: "Center Hall 2142", column: 4, row: 2, span: 1, color: "#2563EB", delay: 0.16 },
+  { id: "math-mon", code: "MATH 20C", time: "10:00 – 11:20", place: "AP&M 2411", column: 1, row: 3, span: 2, color: "#D97706", delay: 0.26 },
+  { id: "math-wed", code: "MATH 20C", time: "10:00 – 11:20", place: "AP&M 2411", column: 3, row: 3, span: 2, color: "#D97706", delay: 0.34 },
+];
+
+const sections = [
+  { section: "001", professor: "Prof. Kim", time: "Tu Th 9:00 – 10:20", rating: 4.6, selected: true },
+  { section: "002", professor: "Prof. Lee", time: "Tu Th 11:00 – 12:20", rating: 4.3, selected: false },
+];
+
+function enter(reduce: boolean, delay = 0, inView = false) {
+  if (reduce) return {};
+  const transition = { duration: 0.8, delay, ease };
+  if (inView) {
+    return {
+      initial: { opacity: 0, y: 28 },
+      whileInView: { opacity: 1, y: 0 },
+      viewport: { once: true, margin: "0px 0px -64px 0px" },
+      transition,
+    };
+  }
+  return {
+    initial: { opacity: 0, y: 18 },
+    animate: { opacity: 1, y: 0 },
+    transition,
+  };
+}
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const reduce = useReducedMotion() === true;
+  const widePlaceholder = useMediaQuery("(min-width: 768px)");
   const [query, setQuery] = useState("");
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -62,422 +60,323 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-72px)] overflow-x-clip bg-white dark:bg-background px-4 pt-8 sm:px-8 lg:pt-9">
-      <section className="relative mx-auto w-full max-w-[1360px]" aria-labelledby="landing-heading">
-        <img
-          src="/illustrations/trident-doodle.png"
-          alt=""
-          className="pointer-events-none absolute left-0 top-8 hidden h-36 w-36 select-none object-contain mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180 lg:block xl:left-4"
-        />
-        <img
-          src="/illustrations/notebook-doodle.png"
-          alt=""
-          className="pointer-events-none absolute left-[-12px] top-[196px] hidden h-40 w-40 select-none object-contain mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180 lg:block xl:left-[-2px]"
-        />
-        <img
-          src="/illustrations/calendar-doodle.png"
-          alt=""
-          className="pointer-events-none absolute right-2 top-6 hidden h-36 w-36 select-none object-contain mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180 lg:block xl:right-5"
-        />
-        <img
-          src="/illustrations/star-doodle.png"
-          alt=""
-          className="pointer-events-none absolute right-8 top-[198px] hidden h-24 w-24 select-none object-contain mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180 lg:block xl:right-12"
-        />
-
-        <div className="relative z-10 mx-auto max-w-[900px] text-center">
-          <h1
+    <div className="overflow-x-clip bg-background text-foreground">
+      <section className="relative isolate min-h-[100svh] overflow-hidden" aria-labelledby="landing-heading">
+        <Sky reduce={reduce} />
+        <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-4 pb-44 pt-28 text-center sm:px-8 sm:pb-52 sm:pt-32">
+          <motion.h1
             id="landing-heading"
-            className="text-balance text-[44px] font-extrabold leading-[0.98] tracking-[-0.055em] text-black dark:text-foreground sm:text-[60px] lg:text-[72px]"
+            {...enter(reduce, 0.05)}
+            className="landing-display text-balance text-[clamp(2.6rem,7vw,4.9rem)] leading-[0.96] tracking-[-0.03em] text-white"
           >
             What are you taking
-            <span className="mx-auto mt-2 block w-fit rounded-[14px] bg-[#eaf2ff] dark:bg-accent px-3 pb-2 pt-1 sm:px-5">
-              next quarter?
-            </span>
-          </h1>
-          <p className="mt-4 text-base text-slate-600 dark:text-muted-foreground sm:text-lg">
+            <span className="mt-1 block italic">next quarter?</span>
+          </motion.h1>
+          <motion.p
+            {...enter(reduce, 0.16)}
+            className="mx-auto mt-5 max-w-xl text-base leading-7 text-white/90 sm:text-lg"
+          >
             Search the catalog and build a conflict-free week.
-          </p>
-
-          <form onSubmit={submitSearch} className="mx-auto mt-5 flex max-w-[930px]" role="search">
-            <label className="relative min-w-0 flex-1">
+          </motion.p>
+          <motion.form
+            {...enter(reduce, 0.26)}
+            onSubmit={submitSearch}
+            role="search"
+            className="group mx-auto mt-8 flex w-full max-w-xl flex-col gap-2 rounded-[28px] bg-white p-2 text-left shadow-[0_18px_50px_-24px_rgba(7,20,50,0.65)] focus-within:ring-4 focus-within:ring-white/40 sm:flex-row sm:items-center sm:rounded-full sm:p-1.5"
+          >
+            <label className="flex min-w-0 flex-1 items-center">
               <span className="sr-only">Search the course catalog</span>
-              <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-600 dark:text-muted-foreground" />
+              <Search className="ml-3 h-4 w-4 shrink-0 text-slate-500" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Try CSE 100, MATH 20C, or a professor"
-                className="h-[76px] w-full rounded-l-lg border border-r-0 border-slate-300 dark:border-border bg-white dark:bg-card pl-16 pr-5 text-base text-slate-950 dark:text-foreground outline-none transition placeholder:text-slate-500 dark:placeholder:text-muted-foreground focus:border-primary dark:focus:border-primary focus:ring-2 focus:ring-primary/15 sm:text-lg"
+                placeholder={widePlaceholder ? "Try CSE 100, MATH 20C, or a professor" : "CSE 100 or a professor"}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="search"
+                className="h-12 min-w-0 flex-1 bg-transparent px-3 text-base text-slate-950 outline-none placeholder:text-slate-500"
               />
             </label>
             <button
               type="submit"
-              className="h-[76px] shrink-0 rounded-r-lg bg-primary px-8 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-w-[184px] sm:text-lg"
+              className="group/cta inline-flex h-12 w-full shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-base font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary sm:w-auto"
             >
               Search
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover/cta:translate-x-0.5 motion-reduce:transition-none" />
             </button>
-          </form>
-          <p className="mt-4 text-sm text-slate-600 dark:text-muted-foreground sm:text-base">
-            Free to use <span className="mx-2">•</span> No account required.
-          </p>
+          </motion.form>
+          <motion.p {...enter(reduce, 0.34)} className="mt-4 text-sm text-white/80">
+            Free to use <span aria-hidden="true">·</span> No account required.
+          </motion.p>
         </div>
+      </section>
 
-        <section
-          aria-label="TritonSchedule preview"
-          className="relative z-10 mt-5 overflow-hidden rounded-lg border border-slate-300 dark:border-border bg-white dark:bg-card lg:grid lg:grid-cols-[0.94fr_1.06fr]"
-        >
-          <div className="min-w-0 lg:border-r lg:border-slate-300 dark:lg:border-border">
-            <div className="flex h-14 items-center justify-between border-b border-slate-300 dark:border-border px-5 text-sm text-slate-700 dark:text-foreground/80 sm:px-6">
-              <span>24 results</span>
-              <span className="flex items-center gap-2">
-                Sort: <span className="text-primary">Relevance</span>
-                <ChevronDown className="h-4 w-4 text-primary" />
-              </span>
-            </div>
+      <div className="relative z-20 mx-auto -mt-36 w-full max-w-5xl px-4 sm:-mt-40 sm:px-8">
+        <ExampleWeek reduce={reduce} />
+      </div>
 
-            <div className="divide-y divide-slate-300 dark:divide-border">
-              {previewCourses.map((course) => (
-                <article key={course.code} className="grid min-h-[128px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 px-5 py-5 sm:px-6">
-                  <strong className="self-start pt-0.5 text-lg text-primary sm:text-xl">{course.code}</strong>
-                  <div className="min-w-0">
-                    <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-foreground sm:text-base">{course.title}</h2>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-muted-foreground sm:text-sm">
-                      <span>{course.professor}</span>
-                      <span className="inline-flex items-center gap-1 text-slate-700 dark:text-foreground/80">
-                        <ProfessorRatingStar rating={Number(course.rating)} className="h-3.5 w-3.5" />
-                        {course.rating}
-                      </span>
-                      <span>•</span>
-                      <span>{course.units}</span>
-                    </div>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-muted-foreground sm:text-sm">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock3 className="h-3.5 w-3.5" />
-                        {course.time}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5" />
-                        {course.location}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="hidden text-sm text-emerald-700 dark:text-emerald-400 sm:inline">{course.open}</span>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/courses?q=${encodeURIComponent(course.code)}`)}
-                      className="h-10 rounded-md border border-primary px-4 text-sm font-medium text-primary transition-colors hover:bg-primary/[0.05] dark:hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <Link
-              to="/courses"
-              className="flex h-14 items-center justify-center gap-2 border-t border-slate-300 dark:border-border text-sm font-medium text-primary hover:bg-primary/[0.025] dark:hover:bg-primary/10"
-            >
-              See more results
-              <ChevronDown className="h-4 w-4" />
-            </Link>
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex h-14 items-center justify-between border-b border-slate-300 dark:border-border px-5 text-sm sm:px-6">
-              <span className="font-semibold text-slate-950 dark:text-foreground">
-                My schedule <span className="font-normal">(1 course)</span>
-              </span>
-              <span className="inline-flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                <CheckCircle2 className="h-5 w-5" />
-                No conflicts
-              </span>
-            </div>
-
-            <div className="grid h-[360px] grid-cols-[62px_repeat(5,minmax(72px,1fr))] overflow-hidden text-xs text-slate-700 dark:text-foreground/80">
-              <div className="border-b border-r border-slate-200 dark:border-border" />
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day) => (
-                <div key={day} className="flex items-center justify-center border-b border-r border-slate-200 dark:border-border last:border-r-0">
-                  {day}
-                </div>
-              ))}
-              {scheduleHours.map((hour, rowIndex) => (
-                <LandingScheduleRow key={hour} hour={hour} rowIndex={rowIndex} />
-              ))}
-            </div>
-
-            <div className="flex h-14 items-center justify-between gap-3 border-t border-slate-300 dark:border-border px-4 text-xs text-slate-600 dark:text-muted-foreground sm:px-5 sm:text-sm">
-              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                <Trash2 className="h-4 w-4" />
-                Clear schedule
-              </span>
-              <span className="hidden truncate sm:inline">Week of Aug 16 – Aug 22, 2026</span>
-              <span className="flex gap-2">
-                <button type="button" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 dark:border-border hover:bg-slate-50 dark:hover:bg-muted" aria-label="Previous week">
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button type="button" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 dark:border-border hover:bg-slate-50 dark:hover:bg-muted" aria-label="Next week">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="how-it-works"
-          aria-labelledby="how-it-works-heading"
-          className="mx-auto max-w-[1288px] scroll-mt-24 pb-20 pt-24 lg:pb-[68px] lg:pt-28"
-        >
-          <h2
+      <section id="how-it-works" aria-labelledby="how-it-works-heading" className="scroll-mt-24">
+        <div className="mx-auto max-w-5xl px-4 pb-8 pt-20 sm:px-8 sm:pt-28">
+          <motion.h2
             id="how-it-works-heading"
-            className="text-[30px] font-extrabold leading-none tracking-[-0.04em] text-black dark:text-foreground sm:text-[34px]"
+            {...enter(reduce, 0, true)}
+            className="max-w-xl text-4xl font-medium tracking-[-0.035em] text-foreground sm:text-5xl"
           >
             How it works
-          </h2>
-
-          <div className="mt-7 grid gap-12 min-[1450px]:grid-cols-[370px_44px_384px_44px_minmax(0,1fr)] min-[1450px]:items-start min-[1450px]:gap-5">
-            <HowItWorksSearch />
-            <div className="hidden pt-1 text-slate-500 dark:text-muted-foreground min-[1450px]:flex min-[1450px]:-translate-x-[26px] min-[1450px]:justify-center" aria-hidden="true">
-              <ArrowRight className="h-7 w-7" />
-            </div>
-            <HowItWorksCompare />
-            <div className="hidden pt-1 text-slate-500 dark:text-muted-foreground min-[1450px]:flex min-[1450px]:-translate-x-[27px] min-[1450px]:justify-center" aria-hidden="true">
-              <ArrowRight className="h-7 w-7" />
-            </div>
-            <HowItWorksSchedule />
+          </motion.h2>
+          <motion.p {...enter(reduce, 0.06, true)} className="mt-4 max-w-lg text-base leading-7 text-muted-foreground">
+            Search the catalog, compare sections, and keep the week in front of you.
+          </motion.p>
+          <div className="mt-10 grid gap-4 lg:grid-cols-2 lg:gap-5">
+            <motion.article
+              {...enter(reduce, 0.05, true)}
+              className="flex min-h-[320px] flex-col rounded-[28px] bg-[#dbe7ff] p-7 text-slate-950 dark:bg-primary/15 dark:text-foreground sm:p-9"
+            >
+              <h3 className="text-2xl font-medium tracking-[-0.03em] sm:text-[1.7rem]">Search classes</h3>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-slate-700 dark:text-foreground/80 sm:text-base">
+                Find courses fast using code, topic, or professor.
+              </p>
+              <div className="mt-auto flex h-14 items-center gap-3 rounded-full bg-white/90 px-4 text-sm text-slate-500 shadow-sm dark:bg-background" aria-hidden="true">
+                <Search className="h-4 w-4" />
+                <span className="truncate">CSE 100, MATH 20C, or a professor</span>
+              </div>
+            </motion.article>
+            <motion.article
+              {...enter(reduce, 0.12, true)}
+              className="flex min-h-[320px] flex-col rounded-[28px] bg-[#f3f4f6] p-7 dark:bg-card sm:p-9"
+            >
+              <h3 className="text-2xl font-medium tracking-[-0.03em] text-foreground sm:text-[1.7rem]">Compare sections</h3>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground sm:text-base">
+                Review times, instructors, and ratings side by side.
+              </p>
+              <div className="mt-auto space-y-2" aria-hidden="true">
+                {sections.map((section) => (
+                  <div
+                    key={section.section}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm",
+                      section.selected ? "bg-white shadow-sm dark:bg-background" : "bg-white/60 dark:bg-background/60",
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-medium text-foreground">{section.professor}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{section.time}</span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-foreground">
+                      <ProfessorRatingStar rating={section.rating} className="h-3.5 w-3.5" />
+                      {section.rating.toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </motion.article>
           </div>
-        </section>
+        </div>
       </section>
 
-      <section
-        id="about"
-        aria-labelledby="about-heading"
-        className="-mx-4 scroll-mt-24 bg-[#f4f8fe] dark:bg-card px-4 py-14 sm:-mx-8 sm:px-8 lg:pb-[37px] lg:pt-16"
-      >
-        <div className="mx-auto w-full max-w-[1200px]">
-          <p className="text-sm font-medium text-slate-600 dark:text-muted-foreground">About TritonSchedule</p>
-          <div className="mt-6 grid items-center gap-8 min-[1200px]:grid-cols-[389px_1px_440px_minmax(0,1fr)] min-[1200px]:gap-9">
-            <h2
-              id="about-heading"
-              className="text-[38px] font-extrabold leading-[1.06] tracking-[-0.05em] text-black dark:text-foreground sm:text-[44px]"
-            >
-              <span className="inline-block rounded-[10px] bg-[#e7f0ff] dark:bg-accent px-2 pb-1">Built for students.</span>
-              <span className="mt-1 block">Free for everyone.</span>
-            </h2>
-
-            <div className="hidden h-[110px] -translate-y-[5px] bg-slate-300 dark:bg-border min-[1200px]:block" aria-hidden="true" />
-
-            <p className="max-w-[440px] text-base leading-[26px] text-slate-700 dark:text-foreground/80">
-              <span className="block">TritonSchedule is a free, unofficial UC San Diego</span>
-              <span className="block">course-planning tool. No account required.</span>
-              <span className="block">We help students save time and make</span>
-              <span className="block">clearer schedules.</span>
-            </p>
-
-            <a
-              href="https://github.com/wangj000/TritonSchedule/issues/new"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-12 w-fit items-center justify-center gap-2 rounded-md border border-primary px-5 text-sm font-semibold text-primary outline-none transition-colors hover:bg-primary/[0.05] dark:hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-2 focus-visible:ring-offset-background min-[1200px]:mt-[18px] min-[1200px]:w-[185px] min-[1200px]:self-start min-[1200px]:justify-self-start"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Send feedback
-            </a>
+      <section id="about" aria-labelledby="about-heading" className="scroll-mt-24">
+        <div className="relative overflow-hidden">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,#dbeafe_0%,transparent_55%)] dark:bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.18),transparent_55%)]"
+          />
+          <div className="relative mx-auto flex max-w-5xl flex-col gap-8 px-4 py-20 sm:px-8 sm:py-28 lg:flex-row lg:items-end lg:justify-between">
+            <motion.div {...enter(reduce, 0, true)} className="max-w-xl">
+              <h2 id="about-heading" className="text-4xl font-medium tracking-[-0.035em] text-foreground sm:text-5xl">
+                Built for students. Free for everyone.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-muted-foreground">
+                TritonSchedule is a free, unofficial UC San Diego course-planning tool. No account required. We help
+                students save time and make clearer schedules.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  to="/courses"
+                  className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  Search the catalog
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <a
+                  href="https://github.com/wangj000/TritonSchedule/issues/new"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                >
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                  Send feedback
+                </a>
+              </div>
+            </motion.div>
+            <motion.div {...enter(reduce, 0.08, true)} className="flex flex-col items-start gap-4 text-sm">
+              <a
+                href="https://github.com/wangj000/TritonSchedule"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              >
+                <Github className="h-4 w-4" aria-hidden="true" />
+                View on GitHub
+              </a>
+              <p className="max-w-xs text-xs leading-5 text-muted-foreground">
+                Not affiliated with UC San Diego. Public course data is subject to change.
+              </p>
+            </motion.div>
           </div>
-
-          <footer className="mt-[54px] flex flex-col gap-4 border-t border-slate-300 dark:border-border pt-[35px] text-sm text-slate-600 dark:text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <a
-              href="https://github.com/wangj000/TritonSchedule"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-fit items-center gap-3 text-sm font-medium text-slate-700 dark:text-foreground/80 outline-none transition-colors hover:text-primary dark:hover:text-primary focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary/20"
-            >
-              <Github className="h-6 w-6 fill-current stroke-[1.5]" aria-hidden="true" />
-              View on GitHub
-            </a>
-            <p>Not affiliated with UC San Diego. Public course data is subject to change.</p>
-          </footer>
         </div>
       </section>
     </div>
   );
 }
 
-function HowItWorksSearch() {
+function Sky({ reduce }: { reduce: boolean }) {
   return (
-    <article className="min-w-0">
-      <HowItWorksHeading number="01" title="Search classes" />
-      <p className="ml-12 mt-2 max-w-[290px] text-sm leading-6 text-slate-600 dark:text-muted-foreground sm:text-base">
-        Find courses fast using code, topic, or professor.
-      </p>
-      <div className="relative mt-8 flex min-h-[190px] items-end gap-1 min-[1450px]:block">
-        <img
-          src="/illustrations/search-mascot.png"
-          alt="Hand-drawn student searching with a magnifying glass"
-          className="h-32 w-32 shrink-0 select-none object-contain mix-blend-multiply dark:mix-blend-screen dark:invert dark:hue-rotate-180 sm:h-40 sm:w-40 min-[1450px]:absolute min-[1450px]:left-[-60px] min-[1450px]:bottom-0 min-[1450px]:-translate-y-2"
-        />
-        <div className="mb-10 flex h-12 min-w-0 flex-1 overflow-hidden rounded-md border border-slate-300 dark:border-border bg-white dark:bg-card text-xs shadow-[0_1px_2px_rgba(15,23,42,0.03)] min-[1450px]:absolute min-[1450px]:bottom-[84px] min-[1450px]:left-[96px] min-[1450px]:mb-0 min-[1450px]:h-10 min-[1450px]:w-[307px] min-[1450px]:translate-y-2">
-          <span className="flex min-w-0 flex-1 items-center gap-2 px-3 text-slate-500 dark:text-muted-foreground">
-            <Search className="h-4 w-4 shrink-0" />
-            <span className="truncate">Try CSE 100, MATH 20C, or a professor</span>
-          </span>
-          <span className="flex w-[72px] shrink-0 items-center justify-center bg-primary font-semibold text-primary-foreground min-[1450px]:w-16">
-            Search
-          </span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function HowItWorksCompare() {
-  return (
-    <article className="min-w-0">
-      <HowItWorksHeading number="02" title="Compare sections" />
-      <p className="ml-12 mt-2 max-w-[320px] text-sm leading-6 text-slate-600 dark:text-muted-foreground sm:text-base">
-        Review options side by side - times, instructors, ratings, and more.
-      </p>
-      <div className="mt-10 overflow-hidden rounded-md border border-slate-300 dark:border-border bg-white dark:bg-card text-[11px] text-slate-600 dark:text-muted-foreground shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:mx-auto sm:max-w-[384px] sm:text-xs min-[1450px]:mx-0 min-[1450px]:mt-9 min-[1450px]:w-[384px] min-[1450px]:translate-y-1">
-        <div className="grid grid-cols-[74px_136px_100px_42px] border-b border-slate-200 dark:border-border px-4 py-3 font-medium text-slate-600 dark:text-muted-foreground">
-          <span>Section</span>
-          <span>Time</span>
-          <span>Professor</span>
-          <span>Rate</span>
-        </div>
-        <MiniSectionRow selected section="001" time="Tu Th 9:00 - 10:20 AM" professor="Prof. Kim" rating="4.6" />
-        <MiniSectionRow section="002" time="Tu Th 11:00 - 12:20 PM" professor="Prof. Lee" rating="4.3" />
-      </div>
-    </article>
-  );
-}
-
-function HowItWorksSchedule() {
-  return (
-    <article className="min-w-0">
-      <HowItWorksHeading number="03" title="Build your week" compact />
-      <p className="ml-[56px] mt-2 max-w-[240px] text-sm leading-6 text-slate-600 dark:text-muted-foreground sm:text-base">
-        Add classes and see your week come together.
-      </p>
-      <div className="relative mt-7 flex min-h-[210px] items-end justify-center min-[1450px]:mt-7 min-[1450px]:block min-[1450px]:min-h-[210px]">
-        <MiniWeekPreview />
-        <img
-          src="/illustrations/schedule-mascot-transparent.png"
-          alt="Hand-drawn student presenting a completed schedule"
-          className="ml-3 mb-1 h-28 w-28 shrink-0 select-none object-contain dark:mix-blend-screen dark:invert dark:hue-rotate-180 sm:h-32 sm:w-32 min-[1450px]:absolute min-[1450px]:bottom-[-11px] min-[1450px]:left-[341px] min-[1450px]:mb-0 min-[1450px]:h-[176px] min-[1450px]:w-[176px]"
-        />
-      </div>
-    </article>
-  );
-}
-
-function HowItWorksHeading({ number, title, compact = false }: { number: string; title: string; compact?: boolean }) {
-  return (
-    <div className={`flex items-center ${compact ? "gap-4" : "gap-5"}`}>
-      <span className="text-[32px] font-medium leading-none tracking-normal text-primary">{number}</span>
-      <h3 className="text-xl font-bold leading-none tracking-[-0.025em] text-black dark:text-foreground sm:text-2xl">{title}</h3>
+    <div aria-hidden="true" className="absolute inset-0">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#08275f_0%,#1357c8_28%,#4aa0f0_52%,#f6d58a_78%,#f09a55_100%)] dark:bg-[linear-gradient(180deg,#041433_0%,#0c3f96_30%,#1d6fd0_54%,#c9893a_82%,#8a4b22_100%)]" />
+      <motion.div
+        className="absolute right-[8%] top-[46%] h-56 w-56 rounded-full bg-[radial-gradient(circle,#fff8dc_0%,#ffd56a_32%,rgba(255,180,70,0)_70%)] sm:h-72 sm:w-72"
+        animate={reduce ? undefined : { y: [0, -14, 0], scale: [1, 1.05, 1] }}
+        transition={reduce ? undefined : { duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="absolute -left-16 bottom-[8%] h-40 w-[46%] rounded-[100%] bg-[#123a86]/70 blur-2xl" />
+      <div className="absolute bottom-[6%] left-[28%] h-28 w-[42%] rounded-[100%] bg-[#f6c453]/50 blur-2xl" />
+      <div className="absolute -right-10 bottom-[4%] h-36 w-[40%] rounded-[100%] bg-[#ef8d45]/55 blur-2xl" />
+      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background" />
     </div>
   );
 }
 
-function MiniSectionRow({
-  selected = false,
-  section,
-  time,
-  professor,
-  rating,
-}: {
-  selected?: boolean;
-  section: string;
-  time: string;
-  professor: string;
-  rating: string;
-}) {
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+
+  return matches;
+}
+
+function ExampleWeek({ reduce }: { reduce: boolean }) {
+  const wide = useMediaQuery("(min-width: 640px)");
+
+  return (
+    <motion.section
+      {...enter(reduce, 0.28)}
+      aria-label="Example schedule"
+      className="overflow-hidden rounded-[28px] border border-white/50 bg-card shadow-[0_30px_80px_-28px_rgba(15,23,42,0.45)]"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <p className="whitespace-nowrap text-sm font-medium text-foreground">Your week</p>
+          <p className="hidden truncate text-xs text-muted-foreground min-[380px]:block">Aug 16 – 22</p>
+        </div>
+        <p className="inline-flex shrink-0 items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          No conflicts
+        </p>
+      </div>
+      <p className="sr-only">
+        Example week with no conflicts. CSE 100 meets Tuesday and Thursday, 9:00 to 9:50 AM, in Center Hall 2142. MATH
+        20C meets Monday and Wednesday, 10:00 to 11:20 AM, in AP&M 2411.
+      </p>
+      {wide ? <WeekGrid reduce={reduce} /> : <WeekList reduce={reduce} />}
+    </motion.section>
+  );
+}
+
+function WeekList({ reduce }: { reduce: boolean }) {
+  return (
+    <ul aria-hidden="true" className="flex flex-col gap-2 px-3 py-3">
+      {mobileMeetings.map((meeting) => (
+        <motion.li
+          key={meeting.day}
+          {...enter(reduce, 0.45 + meeting.delay)}
+          className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2"
+        >
+          <span className="text-xs font-medium text-muted-foreground">{meeting.day}</span>
+          <span
+            className="schedule-event min-w-0 rounded-[5px] border px-3 py-2"
+            style={{ "--event-color": meeting.color } as CSSProperties}
+          >
+            <span className="block truncate text-sm font-semibold leading-5">{meeting.code}</span>
+            <span className="mt-0.5 block truncate text-xs leading-5 opacity-80">
+              {meeting.time} · {meeting.place}
+            </span>
+          </span>
+        </motion.li>
+      ))}
+    </ul>
+  );
+}
+
+function WeekGrid({ reduce }: { reduce: boolean }) {
   return (
     <div
-      className={`grid min-h-14 grid-cols-[74px_136px_100px_42px] items-center px-4 min-[1450px]:min-h-[60px] ${
-        selected ? "bg-primary/[0.055] dark:bg-accent" : "border-t border-slate-200 dark:border-border"
-      }`}
+      aria-hidden="true"
+      className="grid grid-cols-[3rem_repeat(5,minmax(0,1fr))] grid-rows-[2.5rem_repeat(4,4.25rem)]"
     >
-      <span className="flex items-center gap-2">
-        <span className={`h-3.5 w-3.5 rounded-full border ${selected ? "border-[4px] border-primary" : "border-slate-400 dark:border-muted-foreground"}`} />
-        {section}
-      </span>
-      <span className="pr-3 leading-[1.35]">{time}</span>
-      <span className="whitespace-nowrap">{professor}</span>
-      <span className="inline-flex items-center gap-1 whitespace-nowrap">
-        <ProfessorRatingStar rating={Number(rating)} className="h-3 w-3" />
-        {rating}
-      </span>
-    </div>
-  );
-}
-
-function MiniWeekPreview() {
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-  const times = ["9 AM", "10 AM", "11 AM", "12 PM"];
-
-  return (
-    <div className="min-w-0 flex-1 overflow-hidden rounded-md border border-slate-300 dark:border-border bg-white dark:bg-card text-[9px] text-slate-600 dark:text-muted-foreground shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:max-w-[400px] min-[1450px]:w-[400px] min-[1450px]:max-w-none min-[1450px]:flex-none">
-      <div className="grid h-8 grid-cols-[52px_repeat(5,minmax(0,1fr))] border-b border-slate-200 dark:border-border">
-        <span />
-        {days.map((day) => (
-          <span key={day} className="flex items-center justify-center border-l border-slate-200 dark:border-border">
-            {day}
-          </span>
-        ))}
-      </div>
-      <div className="grid h-[144px] grid-cols-[52px_repeat(5,minmax(0,1fr))] grid-rows-4 min-[1450px]:h-[176px]">
-        {times.map((time, rowIndex) => (
-          <MiniWeekRow key={time} time={time} rowIndex={rowIndex} days={days} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MiniWeekRow({ time, rowIndex, days }: { time: string; rowIndex: number; days: string[] }) {
-  return (
-    <>
-      <span className="flex justify-end border-b border-slate-200 dark:border-border pr-1.5 pt-2">{time}</span>
+      <div className="border-b border-border/80 bg-muted/40" />
       {days.map((day) => (
-        <span key={`${time}-${day}`} className="relative border-b border-l border-slate-200 dark:border-border">
-          {((rowIndex === 0 && (day === "Tue" || day === "Thu")) ||
-            (rowIndex === 2 && (day === "Tue" || day === "Thu"))) && (
-            <span className="absolute inset-x-0.5 top-1 overflow-hidden rounded border border-blue-300 dark:border-primary/40 bg-blue-50 dark:bg-primary/10 px-0.5 py-1 leading-tight text-primary">
-              <strong className="block whitespace-nowrap text-[8px]">{rowIndex === 0 ? "CSE 100 LE" : "MATH 20C"}</strong>
-              <span className="block whitespace-nowrap text-[7px] text-slate-600 dark:text-muted-foreground">{rowIndex === 0 ? "9:00 - 9:50" : "11:00 - 12:20"}</span>
-              <span className="block truncate whitespace-nowrap text-[7px] text-slate-600 dark:text-muted-foreground">
-                {rowIndex === 0 ? "Center Hall 2142" : "AP&M 2411"}
-              </span>
-            </span>
-          )}
-        </span>
-      ))}
-    </>
-  );
-}
-
-function LandingScheduleRow({ hour, rowIndex }: { hour: string; rowIndex: number }) {
-  const hasCourse = rowIndex === 1;
-
-  return (
-    <>
-      <div className="flex items-start justify-end border-b border-r border-slate-200 dark:border-border pr-2 pt-2 text-[11px] text-slate-600 dark:text-muted-foreground">
-        {hour}
-      </div>
-      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day) => (
-        <div key={`${hour}-${day}`} className="relative border-b border-r border-slate-200 dark:border-border last:border-r-0">
-          {hasCourse && (day === 'Tue' || day === 'Thu') && (
-            <div className="absolute inset-x-1 top-1 rounded-md border border-blue-300 dark:border-primary/40 bg-blue-50 dark:bg-primary/10 px-2 py-1.5 text-[11px] leading-tight text-slate-700 dark:text-foreground/80">
-              <strong className="block text-primary">CSE 100 LE</strong>
-              <span className="mt-1 block">9:00 – 9:50 AM</span>
-              <span className="block truncate">Center Hall 2142</span>
-            </div>
-          )}
+        <div
+          key={day}
+          className="flex items-center justify-center border-b border-l border-border/80 bg-muted/40 text-xs font-medium text-muted-foreground"
+        >
+          {day}
         </div>
       ))}
-    </>
+      {hours.map((hour, hourIndex) => (
+        <div
+          key={hour}
+          style={{ gridColumn: 1, gridRow: hourIndex + 2 }}
+          className={cn(
+            "pr-2 pt-1 text-right text-[11px] tabular-nums text-muted-foreground",
+            hourIndex < hours.length - 1 && "border-b border-border/80",
+          )}
+        >
+          {hour}
+        </div>
+      ))}
+      {hours.map((hour, hourIndex) =>
+        days.map((day, dayIndex) => (
+          <div
+            key={`${hour}-${day}`}
+            style={{ gridColumn: dayIndex + 2, gridRow: hourIndex + 2 }}
+            className={cn("border-l border-border/80", hourIndex < hours.length - 1 && "border-b border-border/80")}
+          />
+        )),
+      )}
+      {meetings.map((meeting) => (
+        <motion.div
+          key={meeting.id}
+          {...enter(reduce, 0.5 + meeting.delay)}
+          whileHover={reduce ? undefined : { scale: 1.03 }}
+          transition={
+            reduce
+              ? undefined
+              : { duration: 0.6, delay: 0.5 + meeting.delay, ease, scale: { duration: 0.2, delay: 0 } }
+          }
+          title={`${meeting.code}, ${meeting.time}, ${meeting.place}`}
+          style={
+            {
+              gridColumn: meeting.column + 1,
+              gridRow: `${meeting.row} / span ${meeting.span}`,
+              "--event-color": meeting.color,
+            } as CSSProperties
+          }
+          className="schedule-event z-10 m-1.5 flex min-w-0 flex-col justify-center overflow-hidden rounded-[5px] border px-2"
+        >
+          <p className="truncate text-xs font-semibold leading-tight">{meeting.code}</p>
+          <p className="truncate text-[11px] leading-tight opacity-80">{meeting.time}</p>
+          {meeting.span > 1 ? <p className="mt-0.5 truncate text-[11px] leading-tight opacity-80">{meeting.place}</p> : null}
+        </motion.div>
+      ))}
+    </div>
   );
 }

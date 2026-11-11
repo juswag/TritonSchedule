@@ -115,6 +115,11 @@
   animation: page-fade-in 160ms ease-out;
 }
 
+.landing-display {
+  font-family: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
+}
+
 .glass-panel {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));

@@ -1,6 +1,7 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,7 @@ const themeOptions = [
   { value: "system", label: "System", icon: Monitor },
 ];
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme = "system", setTheme } = useTheme();
   const selected = themeOptions.find((option) => option.value === theme) ?? themeOptions[2];
   const Icon = selected.icon;
@@ -28,7 +29,7 @@ export function ThemeToggle() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+          className={cn("h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground", className)}
           aria-label={`Color theme: ${selected.label}`}
           title={`Color theme: ${selected.label}`}
         >
