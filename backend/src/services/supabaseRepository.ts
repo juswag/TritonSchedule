@@ -271,6 +271,11 @@ function toTermDocument(row: TermRow): Term {
 }
 
 export async function searchCourses(course: string, term: string) {
+  const normalizedTerm = term.trim().toUpperCase();
+  if (!normalizedTerm) {
+    throw new Error("A term is required");
+  }
+
   const supabase = connectToDB();
   const rows: OfferingRow[] = [];
   let offset = 0;
@@ -365,9 +370,7 @@ export async function searchCourses(course: string, term: string) {
       }
     }
 
-    if (term.length > 0) {
-      query = query.eq("term_code", term.toUpperCase());
-    }
+    query = query.eq("term_code", normalizedTerm);
 
     const { data, error } = await query;
     throwIfError(error);

@@ -30,15 +30,6 @@ import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConfli
 import { resolveTssBookingUrl } from "@/lib/tssBooking";
 import { toast } from "sonner";
 
-const API_KEY =
-  [import.meta.env.VITE_API_KEY, import.meta.env.API_KEY]
-    .map((value) => (typeof value === "string" ? value.trim() : ""))
-    .find((value) => value.length > 0) ?? "";
-
-// Log the missing production configuration during initialization.
-if (!import.meta.env.DEV && !API_KEY) {
-  console.error("VITE_API_KEY is not set. Set VITE_API_KEY in your environment variables.");
-}
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "/api" : ""));
 const API_BASE_FALLBACK = normalizeApiBase(import.meta.env.VITE_API_BASE_FALLBACK_URL ?? "");
 
@@ -99,17 +90,7 @@ function shouldTryFallback(response: Response): boolean {
 }
 
 function createApiRequestInit(signal: AbortSignal): RequestInit {
-  if (!API_KEY) {
-    // Without a key, send no authorization header and let the API reject the request.
-    return { signal };
-  }
-
-  return {
-    signal,
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-    },
-  };
+  return { signal };
 }
 
 const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
@@ -216,6 +197,13 @@ export default function SearchCourses() {
     }
 
     if (activeTerm === null) return;
+
+    if (!activeTerm) {
+      setCoursesFromBackend([]);
+      setSearchState("idle");
+      setIsBackendLoading(false);
+      return;
+    }
 
     const cached = readCachedSearch(query);
     if (activeTerm && cached && cached.term === activeTerm) {

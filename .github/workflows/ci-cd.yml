@@ -91,6 +91,11 @@ jobs:
           cd backend
           npx tsc --noEmit
 
+      - name: Build
+        run: |
+          cd backend
+          npm run build
+
       - name: Run tests with coverage
         run: |
           cd backend
@@ -112,39 +117,42 @@ jobs:
 
       - name: Validate environment variable documentation
         run: |
-          # Check that all variables in .env.example are documented in README.md
           if [ ! -f README.md ]; then
-            echo "❌ README.md not found"
+            echo "README.md not found"
             exit 1
           fi
 
-          echo "Checking backend env vars..."
-          cd backend
-          if [ -f .env.example ]; then
-            grep -oE '[A-Z_]+=' .env.example | sed 's/=//' | while read var; do
-              if ! grep -q "$var" ../README.md; then
-                echo "❌ Backend env var '$var' is not documented in README.md"
-                MISSING=1
-              fi
-            done
-          fi
+          missing=0
 
-          cd ../frontend
-          if [ -f .env.example ]; then
-            echo "Checking frontend env vars..."
-            grep -oE 'VITE_[A-Z_]+=' .env.example | sed 's/=//' | while read var; do
-              if ! grep -q "$var" ../README.md; then
-                echo "❌ Frontend env var '$var' is not documented in README.md"
-                MISSING=1
-              fi
-            done
-          fi
+          check_file() {
+            local file="$1"
+            local pattern="$2"
+            local label="$3"
 
-          if [ "$MISSING" = "1" ]; then
+            if [ ! -f "$file" ]; then
+              return
+            fi
+
+            echo "Checking ${label} env vars..."
+            while read -r var; do
+              if [ -z "$var" ]; then
+                continue
+              fi
+              if ! grep -q "$var" README.md; then
+                echo "${label} env var '${var}' is not documented in README.md"
+                missing=1
+              fi
+            done < <(grep -oE "$pattern" "$file" | sed 's/=//')
+          }
+
+          check_file backend/.env.example '[A-Z_]+=' backend
+          check_file frontend/.env.example 'VITE_[A-Z_]+=' frontend
+
+          if [ "$missing" = "1" ]; then
             exit 1
           fi
 
-          echo "✅ All environment variables are documented"
+          echo "All environment variables are documented"
 
   # Job 5: Schema/Config Validation
   config-validation:
