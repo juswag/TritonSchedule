@@ -130,16 +130,6 @@ ensure_env_from_example() {
   warn "Created $label env file from $example_file"
 }
 
-generate_secret() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex 32
-    return
-  fi
-
-  command -v node >/dev/null 2>&1 || fail "Missing required command to generate secret: openssl or node"
-  node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-}
-
 set_env_key() {
   local file="$1"
   local key="$2"
@@ -167,58 +157,6 @@ comment_env_key() {
     s/^[ \t]*\Q$ENV{ENV_KEY}\E[ \t]*=.*/"# disabled by setup: " . $&/mge
   ' "$file" > "$tmp"
   mv "$tmp" "$file"
-}
-
-ensure_backend_secret() {
-  local key="$1"
-  local value
-  value="$(env_value "$key" "$BACKEND_ENV")"
-
-  if ! is_placeholder "$value"; then
-    return
-  fi
-
-  if (( CHECK_ONLY )); then
-    return
-  fi
-
-  set_env_key "$BACKEND_ENV" "$key" "$(generate_secret)"
-  log "Set $key in backend/.env for local development."
-}
-
-ensure_api_keys() {
-  local backend_api_key frontend_api_key
-  backend_api_key="$(env_value API_KEY "$BACKEND_ENV")"
-  frontend_api_key="$(env_value VITE_API_KEY "$FRONTEND_ENV")"
-
-  if ! is_placeholder "$backend_api_key" && ! is_placeholder "$frontend_api_key"; then
-    if [[ "$backend_api_key" != "$frontend_api_key" ]]; then
-      warn "frontend VITE_API_KEY does not match backend API_KEY."
-    fi
-    return
-  fi
-
-  if (( CHECK_ONLY )); then
-    return
-  fi
-
-  if is_placeholder "$backend_api_key" && ! is_placeholder "$frontend_api_key"; then
-    set_env_key "$BACKEND_ENV" API_KEY "$frontend_api_key"
-    log "Set API_KEY in backend/.env to match frontend VITE_API_KEY."
-    return
-  fi
-
-  if ! is_placeholder "$backend_api_key" && is_placeholder "$frontend_api_key"; then
-    set_env_key "$FRONTEND_ENV" VITE_API_KEY "$backend_api_key"
-    log "Set VITE_API_KEY in frontend/.env to match backend API_KEY."
-    return
-  fi
-
-  local generated_api_key
-  generated_api_key="$(generate_secret)"
-  set_env_key "$BACKEND_ENV" API_KEY "$generated_api_key"
-  set_env_key "$FRONTEND_ENV" VITE_API_KEY "$generated_api_key"
-  log "Set matching API keys in backend/.env and frontend/.env for local development."
 }
 
 ensure_no_mongo_env() {
@@ -266,14 +204,7 @@ sync_local_supabase_env() {
   status="$(supabase status -o env)"
 
   set_env_key "$BACKEND_ENV" SUPABASE_URL "$(status_env_value API_URL "$status")"
-  set_env_key "$BACKEND_ENV" SUPABASE_PUBLISHABLE_KEY "$(status_env_value PUBLISHABLE_KEY "$status")"
-  set_env_key "$BACKEND_ENV" SUPABASE_ANON_KEY "$(status_env_value ANON_KEY "$status")"
   set_env_key "$BACKEND_ENV" SUPABASE_SERVICE_ROLE_KEY "$(status_env_value SERVICE_ROLE_KEY "$status")"
-  set_env_key "$BACKEND_ENV" DATABASE_URL "$(status_env_value DB_URL "$status")"
-
-  if is_placeholder "$(env_value DB_PASSWORD "$BACKEND_ENV")"; then
-    set_env_key "$BACKEND_ENV" DB_PASSWORD "postgres"
-  fi
 
   log "Synced backend/.env from local Supabase status."
 }
@@ -328,7 +259,7 @@ start_local_supabase() {
 }
 
 validate_backend_env() {
-  local required=(SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY API_KEY JWT_SECRET)
+  local required=(SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY)
   local missing=()
 
   for key in "${required[@]}"; do
@@ -341,24 +272,11 @@ validate_backend_env() {
     fail "Missing or placeholder required backend env values in backend/.env: ${missing[*]}"
   fi
 
-  local recommended=(SUPABASE_PUBLISHABLE_KEY SUPABASE_ANON_KEY DATABASE_URL DB_PASSWORD)
-  local missing_recommended=()
-
-  for key in "${recommended[@]}"; do
-    if is_placeholder "$(env_value "$key" "$BACKEND_ENV")"; then
-      missing_recommended+=("$key")
-    fi
-  done
-
-  if (( ${#missing_recommended[@]} > 0 )); then
-    warn "Missing or placeholder recommended backend env values in backend/.env: ${missing_recommended[*]}"
-  fi
-
   log "Validated backend/.env for Supabase local development."
 }
 
 validate_frontend_env() {
-  local required=(VITE_API_BASE_URL VITE_API_KEY)
+  local required=(VITE_API_BASE_URL)
   local missing=()
 
   for key in "${required[@]}"; do
@@ -369,16 +287,6 @@ validate_frontend_env() {
 
   if (( ${#missing[@]} > 0 )); then
     warn "Missing or placeholder frontend env values in frontend/.env: ${missing[*]}"
-  fi
-
-  local backend_api_key frontend_api_key
-  backend_api_key="$(env_value API_KEY "$BACKEND_ENV")"
-  frontend_api_key="$(env_value VITE_API_KEY "$FRONTEND_ENV")"
-
-  if ! is_placeholder "$backend_api_key" &&
-    ! is_placeholder "$frontend_api_key" &&
-    [[ "$backend_api_key" != "$frontend_api_key" ]]; then
-    warn "frontend VITE_API_KEY does not match backend API_KEY."
   fi
 }
 
@@ -405,8 +313,6 @@ install_deps_for() {
 
 ensure_env_from_example "$BACKEND_ENV" "$ROOT_DIR/backend/.env.example" "backend"
 ensure_env_from_example "$FRONTEND_ENV" "$ROOT_DIR/frontend/.env.example" "frontend"
-ensure_api_keys
-ensure_backend_secret JWT_SECRET
 ensure_no_mongo_env
 
 if ! has_required_supabase_env && (( ! CHECK_ONLY )) && [[ "$SUPABASE_MODE" != "skip" ]]; then

@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.tritonschedule.com/api/:path*"
+      "destination": "https://triton-schedule-alpha.vercel.app/:path*"
     },
     {
       "source": "/(.*)",

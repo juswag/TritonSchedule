@@ -1,6 +1,7 @@
+import type { Request, Response } from "express";
 import { getActiveTermRow } from "../services/supabaseRepository.js";
 
-export async function getActiveTerm(req: any, res: any) {
+export async function getActiveTerm(_req: Request, res: Response) {
   const currentTerm = await getActiveTermRow();
 
   if (!currentTerm) {
