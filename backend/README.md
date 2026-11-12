@@ -100,7 +100,11 @@ Partial professor failures update successful ratings, preserve previously stored
 If the school lookup fails or no professor request succeeds, the command exits unsuccessfully after recording the professor-phase failure; it does not roll back the published catalog or replace existing ratings.
 
 Each run writes counts, warnings, publication state, and the workflow URL to `private.catalog_ingestion_runs` through service-role-only functions.
-Starting a run rejects overlap with another active run, marks runs older than four hours as failed, and removes audit and completed or failed catalog-refresh records older than 90 days.
+Starting a run rejects overlap with another active nightly run, marks nightly runs older than four hours as failed, and removes nightly audit rows and completed or failed catalog-refresh records older than 90 days.
+
+`GET /api/seats/poll` refreshes seat counts between nightly publishes. Vercel Cron calls it every 15 minutes with `Authorization: Bearer <CRON_SECRET>`. A missing or wrong token returns 401 and does not scrape. The poll reuses the public Class Planner catalog search. `apply_seat_updates` then updates only section rows whose seat, enrollment, waitlist, or status values changed. Unknown section ids are counted and left for the nightly sync. A failed or partial scrape writes no seat rows. Seat poll audit rows use `kind = 'seats'` and are deleted after 14 days. A running seat poll does not block the nightly job. The nightly replace and a seat write share one advisory lock. An overlapping poll skips.
+
+Set `CRON_SECRET` on the backend Vercel project. Vercel Cron sends that value as a bearer token. The `*/15` schedule needs a plan that allows crons more than once per day. Hobby plans allow a daily cron only. The poll function allows up to 300 seconds so a full catalog scrape can finish on Pro.
 
 ### Manual room and booking import
 

@@ -14,6 +14,7 @@ export type Section = {
     capacity: number | null;
     seatsAvailable: number | null;
     waitlisted: number | null;
+    seatsUpdatedAt?: string | null;
   };
   /** Class Planner section identifier. */
   SectionId?: string;

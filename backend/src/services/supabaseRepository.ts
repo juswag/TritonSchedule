@@ -1,6 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import type { Course } from "../models/Course.js";
+import type { SeatApplyResult, SeatPollClaim, SeatUpdateBatch } from "../models/SeatUpdate.js";
 import type {
   ClassPlannerCatalogSnapshot,
   ClassPlannerCourse,
@@ -317,6 +318,7 @@ export async function searchCourses(course: string, term: string) {
           waitlist_enrolled,
           waitlist_available,
           status,
+          seats_updated_at,
           instructors,
           manual_details (rooms, packages, route),
           tss_event_packages (
@@ -580,6 +582,68 @@ export async function failCatalogIngestionRun(
     p_warnings: input.warnings,
   });
   throwIfError(error);
+}
+
+function numberField(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error("Seat update result is invalid");
+  }
+  return value;
+}
+
+function parseSeatPollClaim(value: unknown): SeatPollClaim {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : null;
+  if (record?.status === "started") return { status: "started" };
+  if (record?.status === "skipped") {
+    return {
+      status: "skipped",
+      reason: typeof record.reason === "string" ? record.reason : "overlap",
+    };
+  }
+  throw new Error("Seat poll claim is invalid");
+}
+
+function parseSeatApplyResult(value: unknown): SeatApplyResult {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : null;
+  if (!record || typeof record.applied !== "boolean") {
+    throw new Error("Seat update result is invalid");
+  }
+
+  return {
+    applied: record.applied,
+    changed: numberField(record, "changed"),
+    unchanged: numberField(record, "unchanged"),
+    unknown: numberField(record, "unknown"),
+    offeringsUpdated: numberField(record, "offeringsUpdated"),
+    ...(typeof record.reason === "string" ? { reason: record.reason } : {}),
+  };
+}
+
+export async function claimSeatPollRun(id: string): Promise<SeatPollClaim> {
+  const supabase = connectToDB();
+  const { data, error } = await supabase.rpc("claim_seat_poll_run", {
+    p_run_id: id,
+    p_trigger: "cron",
+  });
+  throwIfError(error);
+  return parseSeatPollClaim(data);
+}
+
+export async function applySeatUpdates(
+  runId: string,
+  term: string,
+  update: SeatUpdateBatch,
+): Promise<SeatApplyResult> {
+  const supabase = connectToDB();
+  const { data, error } = await supabase.rpc("apply_seat_updates", {
+    p_offerings: update.offerings,
+    p_run_id: runId,
+    p_sections: update.sections,
+    p_term: term,
+  });
+  throwIfError(error);
+  return parseSeatApplyResult(data);
 }
 
 /** Reports whether the latest requested professor phase warned or failed. */

@@ -4,5 +4,16 @@
   "buildCommand": "npm run build",
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "functions": {
+    "src/app.ts": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/seats/poll",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

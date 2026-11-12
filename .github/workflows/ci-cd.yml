@@ -65,6 +65,21 @@ jobs:
   # Job 3: Backend CI
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SEAT_POLL_ADMIN_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

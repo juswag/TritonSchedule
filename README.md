@@ -8,6 +8,10 @@
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT" />
 </div>
 
+## Environment
+
+`CRON_SECRET` authorizes `GET /api/seats/poll`. Set it on the backend Vercel project. Vercel Cron sends `Authorization: Bearer` plus that secret. The seat poll schedule is every 15 minutes, which needs a Vercel plan that allows more than one cron run per day.
+
 ## Features
 
 - Search the active UCSD Class Planner catalog by course, title, or instructor and compare lecture, discussion, and lab choices against the current schedule.
