@@ -42,6 +42,7 @@ export type ClassPlannerSection = Readonly<{
   waitlist_available: number | null;
   status: string | null;
   seats_updated_at?: string | null;
+  ingested_at?: string | null;
   instructors: string[];
   meetings: ClassPlannerMeeting[];
 }>;

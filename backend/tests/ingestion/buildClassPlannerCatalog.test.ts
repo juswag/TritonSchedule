@@ -2,11 +2,21 @@ import { describe, expect, it } from "@jest/globals";
 import {
   buildClassPlannerCatalog,
   buildLegacyCourses,
+  buildLegacySections,
   classPlannerSourceKey,
 } from "../../src/ingestion/buildClassPlannerCatalog.js";
 import { classMeeting, classPlannerCourse } from "./classPlannerFixtures.js";
 
 describe("buildClassPlannerCatalog", () => {
+  it("uses the nightly publish time when a section has no seat poll timestamp", () => {
+    const section = classPlannerCourse().sections[0]!;
+    const [withPoll] = buildLegacySections([{ ...section, seats_updated_at: "2026-11-12T20:00:00.000Z", ingested_at: "2026-11-12T08:00:00.000Z" }]);
+    const [fromPublish] = buildLegacySections([{ ...section, ingested_at: "2026-11-12T08:00:00.000Z" }]);
+
+    expect(withPoll?.Enrollment?.seatsUpdatedAt).toBe("2026-11-12T20:00:00.000Z");
+    expect(fromPublish?.Enrollment?.seatsUpdatedAt).toBe("2026-11-12T08:00:00.000Z");
+  });
+
   it("preserves the catalog and package memberships without TSS routes", () => {
     const course = classPlannerCourse(10);
     const catalog = buildClassPlannerCatalog("FA26", [course], []);

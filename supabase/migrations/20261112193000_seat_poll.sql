@@ -457,6 +457,25 @@ begin
       and status = 'staging'
   ) then
     skip_reason := 'replace';
+  elsif exists (
+    select 1
+    from public.class_planner_sections as section
+    join private.catalog_ingestion_runs as current_run
+      on current_run.id = p_run_id
+    where section.term_code = p_term
+      and section.ingested_at > current_run.started_at
+  ) or exists (
+    select 1
+    from private.catalog_ingestion_runs as newer
+    join private.catalog_ingestion_runs as current_run
+      on current_run.id = p_run_id
+    where newer.id <> current_run.id
+      and newer.kind = 'seats'
+      and newer.status in ('succeeded', 'succeeded_with_warnings')
+      and newer.completed_at > current_run.started_at
+      and newer.catalog_counts ->> 'applied' = 'true'
+  ) then
+    skip_reason := 'stale';
   end if;
 
   if skip_reason is not null then

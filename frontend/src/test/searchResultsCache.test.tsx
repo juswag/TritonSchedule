@@ -80,6 +80,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   localStorage.clear();
   sessionStorage.clear();
@@ -121,6 +122,17 @@ describe("search result cache", () => {
     });
     const courseRequests = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
     expect(courseRequests).toHaveLength(0);
+  });
+
+  it("refetches an open search when the five minute cache expires", async () => {
+    storeCache(Date.now() - SEARCH_RESULTS_CACHE_TTL_MS + 400);
+    renderSearch();
+
+    expect((await screen.findAllByText("Cached Title")).length).toBeGreaterThan(0);
+    await screen.findByText("Fall 2026");
+    const beforeExpiry = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
+    expect(beforeExpiry).toHaveLength(0);
+    expect((await screen.findAllByText("Fresh Title", {}, { timeout: 2000 })).length).toBeGreaterThan(0);
   });
 
   it("shows a stale cached search and then replaces it from GET /course", async () => {

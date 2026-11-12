@@ -319,6 +319,7 @@ export async function searchCourses(course: string, term: string) {
           waitlist_available,
           status,
           seats_updated_at,
+          ingested_at,
           instructors,
           manual_details (rooms, packages, route),
           tss_event_packages (

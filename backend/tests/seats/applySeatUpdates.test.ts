@@ -282,6 +282,20 @@ describe("apply_seat_updates", () => {
     expect(await section("section-a")).toEqual(before);
   });
 
+  it("writes no seat rows when the catalog was replaced after the poll started", async () => {
+    const { id } = await claim();
+    await client.query(
+      "update private.catalog_ingestion_runs set started_at = now() - interval '1 hour' where id = $1",
+      [id],
+    );
+
+    const result = await apply(id, [sectionPayload("section-a", 4, 96)], [offeringPayload("section-a", 4)]);
+
+    expect(result).toMatchObject({ applied: false, reason: "stale", changed: 0 });
+    expect((await section("section-a")).seats_available).toBe(10);
+    expect((await section("section-a")).seats_updated_at).toBeNull();
+  });
+
   it("writes no seat rows when the catalog replace lock is held", async () => {
     const { id } = await claim();
     const lock = new pg.Client({ connectionString: databaseUrl(databaseName) });

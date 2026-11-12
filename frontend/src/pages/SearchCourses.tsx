@@ -27,7 +27,12 @@ import { getCourseExams } from "@/lib/examSchedule";
 import { cn } from "@/lib/utils";
 import { getProfessorProfileUrl, normalizeProfessorProfileUrl } from "@/lib/professorProfile";
 import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConflicts";
-import { isSearchCacheFresh, readCachedSearch, writeCachedSearch } from "@/lib/searchResultsCache";
+import {
+  isSearchCacheFresh,
+  readCachedSearch,
+  SEARCH_RESULTS_CACHE_TTL_MS,
+  writeCachedSearch,
+} from "@/lib/searchResultsCache";
 import { resolveTssBookingUrl } from "@/lib/tssBooking";
 import { toast } from "sonner";
 
@@ -126,6 +131,7 @@ export default function SearchCourses() {
     initialCache ? "restored" : "idle"
   );
   const [activeTerm, setActiveTerm] = useState<string | null>(null);
+  const [cacheRevision, setCacheRevision] = useState(0);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
@@ -197,11 +203,13 @@ export default function SearchCourses() {
 
     const cached = readCachedSearch(query);
     const cacheMatchesTerm = Boolean(cached && cached.term === activeTerm);
-    if (cacheMatchesTerm && cached && isSearchCacheFresh(cached, Date.now())) {
+    if (cacheMatchesTerm && cached && isSearchCacheFresh(cached, Date.now()) && typeof cached.cachedAt === "number") {
       setCoursesFromBackend(cached.results);
       setSearchState(cached.searchState);
       setIsBackendLoading(false);
-      return;
+      const remaining = SEARCH_RESULTS_CACHE_TTL_MS - (Date.now() - cached.cachedAt);
+      const timer = window.setTimeout(() => setCacheRevision((revision) => revision + 1), remaining);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();
@@ -246,7 +254,7 @@ export default function SearchCourses() {
     return () => {
       controller.abort();
     };
-  }, [debouncedSearchQuery, activeTerm]);
+  }, [debouncedSearchQuery, activeTerm, cacheRevision]);
 
   const displayedCourses = coursesFromBackend;
   const isDebouncingSearch =
