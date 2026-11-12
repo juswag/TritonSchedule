@@ -27,6 +27,7 @@ import { getCourseExams } from "@/lib/examSchedule";
 import { cn } from "@/lib/utils";
 import { getProfessorProfileUrl, normalizeProfessorProfileUrl } from "@/lib/professorProfile";
 import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConflicts";
+import { isSearchCacheFresh, readCachedSearch, writeCachedSearch } from "@/lib/searchResultsCache";
 import { resolveTssBookingUrl } from "@/lib/tssBooking";
 import { toast } from "sonner";
 
@@ -112,29 +113,6 @@ function createApiRequestInit(signal: AbortSignal): RequestInit {
   };
 }
 
-const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
-
-type CachedSearch = {
-  query: string;
-  term: string;
-  results: Course[];
-  searchState: "success" | "not_found";
-};
-
-function readCachedSearch(query: string): CachedSearch | null {
-  if (!query) return null;
-  try {
-    const stored = sessionStorage.getItem(SEARCH_RESULTS_CACHE_KEY);
-    const cache = stored ? JSON.parse(stored) : null;
-    return cache?.query === query && typeof cache.term === "string" &&
-      Array.isArray(cache.results) &&
-      cache.searchState === (cache.results.length ? "success" : "not_found")
-      ? cache : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function SearchCourses() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() =>
@@ -218,7 +196,8 @@ export default function SearchCourses() {
     if (activeTerm === null) return;
 
     const cached = readCachedSearch(query);
-    if (activeTerm && cached && cached.term === activeTerm) {
+    const cacheMatchesTerm = Boolean(cached && cached.term === activeTerm);
+    if (cacheMatchesTerm && cached && isSearchCacheFresh(cached, Date.now())) {
       setCoursesFromBackend(cached.results);
       setSearchState(cached.searchState);
       setIsBackendLoading(false);
@@ -228,9 +207,15 @@ export default function SearchCourses() {
     const controller = new AbortController();
 
     const fetchCourses = async () => {
-      setIsBackendLoading(true);
-      setSearchState("loading");
-      setCoursesFromBackend([]);
+      if (cacheMatchesTerm && cached) {
+        setCoursesFromBackend(cached.results);
+        setSearchState(cached.searchState);
+        setIsBackendLoading(false);
+      } else {
+        setIsBackendLoading(true);
+        setSearchState("loading");
+        setCoursesFromBackend([]);
+      }
       try {
         const backendCourses = await searchBackendCourses(query, controller.signal, activeTerm);
         if (controller.signal.aborted) return;
@@ -238,20 +223,17 @@ export default function SearchCourses() {
         setCoursesFromBackend(mappedCourses);
         const resolvedSearchState = mappedCourses.length > 0 ? "success" : "not_found";
         setSearchState(resolvedSearchState);
-        sessionStorage.setItem(
-          SEARCH_RESULTS_CACHE_KEY,
-          JSON.stringify({
-            query,
-            term: activeTerm,
-            results: mappedCourses,
-            searchState: resolvedSearchState,
-          })
-        );
+        writeCachedSearch({
+          query,
+          term: activeTerm,
+          results: mappedCourses,
+          searchState: resolvedSearchState,
+          cachedAt: Date.now(),
+        });
       } catch (error) {
-        if ((error as Error).name !== "AbortError") {
-          setCoursesFromBackend([]);
-          setSearchState("error");
-        }
+        if ((error as Error).name === "AbortError" || cacheMatchesTerm) return;
+        setCoursesFromBackend([]);
+        setSearchState("error");
       } finally {
         if (!controller.signal.aborted) {
           setIsBackendLoading(false);
@@ -515,6 +497,7 @@ export default function SearchCourses() {
                   {displayedCourses.map((course) => {
                     const isSelected = selectedCourse?.id === course.id;
                     const meetingGroups = getCourseScheduleParts(course);
+                    const seatsAsOf = seatsAsOfLabel(course.enrollment?.seatsUpdatedAt);
                     return (
                       <div
                         key={course.id}
@@ -537,6 +520,7 @@ export default function SearchCourses() {
                           <span className="text-sm font-semibold text-foreground">{getCourseCode(course.name)}</span>
                           <span className="max-w-full truncate text-xs text-foreground/70">{getCourseTitle(course.name)}</span>
                           {course.enrollment?.seatsAvailable != null && <SeatStatus seats={course.enrollment.seatsAvailable} />}
+                          {seatsAsOf && <span className="text-xs text-muted-foreground">{seatsAsOf}</span>}
                         </span>
                         <span className="pointer-events-none relative z-[1] grid min-w-0 grid-rows-[1.75rem_1.25rem] content-center gap-2 text-sm text-foreground/80">
                           <span className="flex items-center truncate">{course.instructor}</span>
@@ -798,6 +782,17 @@ function SearchState({ title, description }: { title: string; description?: stri
   );
 }
 
+function seatsAsOfLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  return `seats as of ${time}`;
+}
+
 function SeatStatus({ seats }: { seats: number }) {
   const open = seats > 0;
   const Icon = open ? CircleCheck : CircleMinus;
@@ -817,17 +812,19 @@ function EnrollmentSummary({ enrollment, compact = false, fallback }: {
   fallback?: string;
 }) {
   if (!enrollment || Object.values(enrollment).every(value => value == null)) return fallback ? <span className="mt-2 block text-sm text-muted-foreground">{fallback}</span> : null;
-  const { enrolled, capacity, seatsAvailable, waitlisted } = enrollment;
+  const { enrolled, capacity, seatsAvailable, waitlisted, seatsUpdatedAt } = enrollment;
   const details = [];
   if (enrolled != null && capacity != null) details.push(`${enrolled} of ${capacity} enrolled`);
   else if (enrolled != null) details.push(`${enrolled} enrolled`);
   else if (capacity != null) details.push(`${capacity} total seats`);
   if (waitlisted != null) details.push(`${waitlisted} waitlisted`);
+  const asOf = seatsAsOfLabel(seatsUpdatedAt);
 
   return (
     <span className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground", compact ? "mt-2" : "mt-3")}>
       {seatsAvailable != null && <SeatStatus seats={seatsAvailable} />}
       {details.map(detail => <span key={detail}>{detail}</span>)}
+      {asOf && <span>{asOf}</span>}
     </span>
   );
 }
