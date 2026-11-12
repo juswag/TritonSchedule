@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CalendarProvider } from "@/context/CalendarContext";
 import SearchCourses from "@/pages/SearchCourses";
@@ -22,7 +22,6 @@ const cachedCourse = {
     capacity: 100,
     seatsAvailable: 9,
     waitlisted: 0,
-    seatsUpdatedAt: "2026-11-12T20:15:00.000Z",
   },
 };
 
@@ -40,7 +39,6 @@ const freshCourse = {
       capacity: 100,
       seatsAvailable: 8,
       waitlisted: 0,
-      seatsUpdatedAt: "2026-11-12T20:15:00.000Z",
     },
   },
   Discussions: [],
@@ -116,7 +114,6 @@ describe("search result cache", () => {
     renderSearch();
 
     expect((await screen.findAllByText("Cached Title")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/seats as of/).length).toBeGreaterThan(0);
     await waitFor(() => {
       expect(screen.getByText("Fall 2026")).toBeVisible();
     });
@@ -133,6 +130,40 @@ describe("search result cache", () => {
     const beforeExpiry = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
     expect(beforeExpiry).toHaveLength(0);
     expect((await screen.findAllByText("Fresh Title", {}, { timeout: 2000 })).length).toBeGreaterThan(0);
+  });
+
+  it("keeps refreshing after a network fetch and stops after unmount", async () => {
+    vi.useFakeTimers();
+    const view = renderSearch();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    const requests = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
+    expect(requests()).toHaveLength(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(SEARCH_RESULTS_CACHE_TTL_MS); });
+    expect(requests()).toHaveLength(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(SEARCH_RESULTS_CACHE_TTL_MS); });
+    expect(requests()).toHaveLength(3);
+
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(SEARCH_RESULTS_CACHE_TTL_MS); });
+    expect(requests()).toHaveLength(3);
+  });
+
+  it("retries a failed background refresh without clearing cached results", async () => {
+    vi.useFakeTimers();
+    storeCache(Date.now() - SEARCH_RESULTS_CACHE_TTL_MS - 1);
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    let attempts = 0;
+    vi.mocked(fetch).mockImplementation(async (...args) => {
+      if (String(args[0]).includes("/course?") && attempts++ === 0) throw new Error("offline");
+      return originalFetch(...args);
+    });
+    renderSearch();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(screen.getAllByText("Cached Title").length).toBeGreaterThan(0);
+    await act(async () => { await vi.advanceTimersByTimeAsync(SEARCH_RESULTS_CACHE_TTL_MS); });
+    expect(screen.getAllByText("Fresh Title").length).toBeGreaterThan(0);
+    expect(attempts).toBe(2);
   });
 
   it("shows a stale cached search and then replaces it from GET /course", async () => {
@@ -160,7 +191,6 @@ describe("search result cache", () => {
     }));
     expect((await screen.findAllByText("Fresh Title")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Cached Title")).not.toBeInTheDocument();
-    expect(screen.getAllByText(/seats as of/).length).toBeGreaterThan(0);
     const courseRequests = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/course?"));
     expect(courseRequests.length).toBeGreaterThan(0);
   });

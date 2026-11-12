@@ -10,7 +10,7 @@
 
 ## Environment
 
-GitHub Actions polls seats every 15 minutes. Set the repository Actions variable `SEAT_POLL_BASE_URL` to the production backend origin and the Actions secret `CRON_SECRET` to the same value used by the backend. See [seat polling setup](backend/README.md#seat-polling).
+GitHub Actions polls seats every 15 minutes using the same `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` repository secrets as nightly ingestion. See [seat polling setup](backend/README.md#seat-polling).
 
 ## Features
 

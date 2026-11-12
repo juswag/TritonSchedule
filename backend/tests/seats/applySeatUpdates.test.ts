@@ -1,11 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import express from "express";
 import pg from "pg";
-import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "@jest/globals";
-import { createPollSeatsHandler } from "../../src/controllers/pollSeats.js";
 import { pollOpenSeats } from "../../src/ingestion/seatPoll.js";
 import { scrapeClassPlanner, type ClassPlannerFetch } from "../../src/ingestion/scrapeClassPlanner.js";
 import type { SeatApplyResult, SeatPollClaim } from "../../src/models/SeatUpdate.js";
@@ -13,13 +10,12 @@ import { classPlannerCourse } from "../ingestion/classPlannerFixtures.js";
 
 const adminUrl = process.env.SEAT_POLL_ADMIN_URL ?? "postgres://postgres:postgres@127.0.0.1:5432/postgres";
 const databaseName = "tritonschedule_seat_test";
-const keptAt = "2020-01-01T00:00:00.000Z";
 
 type SectionSnapshot = {
   seats_available: number | null;
   enrolled: number | null;
   status: string | null;
-  seats_updated_at: Date | null;
+  row_version: string;
   instructors: string[];
 };
 
@@ -27,7 +23,7 @@ type OfferingSnapshot = {
   open_seat_count: number;
   open_section_count: number;
   waitlist_available_count: number;
-  seats_updated_at: Date | null;
+  row_version: string;
   course_title: string | null;
 };
 
@@ -100,7 +96,7 @@ async function apply(
 
 async function section(sectionId: string): Promise<SectionSnapshot> {
   const result = await client.query<SectionSnapshot>(
-    `select seats_available, enrolled, status, seats_updated_at, instructors
+    `select seats_available, enrolled, status, xmin::text as row_version, instructors
      from public.class_planner_sections
      where term_code = 'FA26' and section_id = $1`,
     [sectionId],
@@ -111,7 +107,7 @@ async function section(sectionId: string): Promise<SectionSnapshot> {
 async function offering(sourceKey: string): Promise<OfferingSnapshot> {
   const result = await client.query<OfferingSnapshot>(
     `select open_seat_count, open_section_count, waitlist_available_count,
-            seats_updated_at, course_title
+            xmin::text as row_version, course_title
      from public.class_planner_course_offerings
      where source_key = $1`,
     [sourceKey],
@@ -187,16 +183,11 @@ describe("apply_seat_updates", () => {
       insert into public.class_planner_sections (
         offering_id, term_code, section_id, section_ref, section_code,
         instruction_type_name, capacity, enrolled, seats_available,
-        waitlist_enrolled, status, instructors, seats_updated_at
+        waitlist_enrolled, status, instructors
       )
-      select id, 'FA26', 'section-b', 'FA26:section-b', 'B01', 'lecture', 100, 93, 7, 0, 'AC', array['Grace Hopper'], $1::timestamptz
+      select id, 'FA26', 'section-b', 'FA26:section-b', 'B01', 'lecture', 100, 93, 7, 0, 'AC', array['Grace Hopper']
       from public.class_planner_course_offerings where source_key = 'offering-b'
-    `, [keptAt]);
-    await client.query(`
-      update public.class_planner_course_offerings
-      set seats_updated_at = $1::timestamptz
-      where source_key = 'offering-b'
-    `, [keptAt]);
+    `);
   });
 
   it("updates a changed seat, leaves an unchanged row alone, and counts unknown sections", async () => {
@@ -230,22 +221,18 @@ describe("apply_seat_updates", () => {
 
     expect(changed.seats_available).toBe(4);
     expect(changed.enrolled).toBe(96);
-    expect(changed.seats_updated_at).not.toBeNull();
     expect(changed.instructors).toEqual(["Ada Lovelace"]);
     expect(unchanged).toEqual(before);
-    expect(unchanged.seats_updated_at?.toISOString()).toBe(keptAt);
     expect(changedOffering.open_seat_count).toBe(4);
-    expect(changedOffering.seats_updated_at).not.toBeNull();
     expect(changedOffering.course_title).toBe("Changed title");
     expect(unchangedOffering.open_seat_count).toBe(7);
-    expect(unchangedOffering.seats_updated_at?.toISOString()).toBe(keptAt);
     expect(unchangedOffering.course_title).toBe("Keep title");
 
     const again = await apply((await claim()).id, sections, offerings);
     const afterRepeat = await section("section-a");
 
     expect(again).toMatchObject({ applied: true, changed: 0, unchanged: 2, unknown: 1 });
-    expect(afterRepeat.seats_updated_at?.toISOString()).toBe(changed.seats_updated_at?.toISOString());
+    expect(afterRepeat.row_version).toBe(changed.row_version);
   });
 
   it("writes no seat rows when the payload is invalid", async () => {
@@ -293,7 +280,26 @@ describe("apply_seat_updates", () => {
 
     expect(result).toMatchObject({ applied: false, reason: "stale", changed: 0 });
     expect((await section("section-a")).seats_available).toBe(10);
-    expect((await section("section-a")).seats_updated_at).toBeNull();
+  });
+
+  it("rejects an older scrape after a newer poll has applied", async () => {
+    const older = await claim();
+    // Simulate an abandoned worker resuming after its lease expired.
+    await client.query("update private.catalog_ingestion_runs set status = 'failed' where id = $1", [older.id]);
+    const newer = await claim();
+    await apply(newer.id, [sectionPayload("section-a", 3, 97)], [offeringPayload("section-a", 3)]);
+    await client.query("update private.catalog_ingestion_runs set status = 'running' where id = $1", [older.id]);
+
+    const result = await apply(older.id, [sectionPayload("section-a", 9, 91)], [offeringPayload("section-a", 9)]);
+    expect(result).toMatchObject({ applied: false, reason: "stale" });
+    expect((await section("section-a")).seats_available).toBe(3);
+  });
+
+  it("does not grant polling RPC access to public clients", async () => {
+    const result = await client.query<{ allowed: boolean }>(
+      "select has_function_privilege('anon', 'public.apply_seat_updates(uuid,text,jsonb,jsonb)', 'EXECUTE') as allowed",
+    );
+    expect(result.rows[0]?.allowed).toBe(false);
   });
 
   it("writes no seat rows when the catalog replace lock is held", async () => {
@@ -305,7 +311,6 @@ describe("apply_seat_updates", () => {
       const result = await apply(id, [sectionPayload("section-a", 4, 96)], [offeringPayload("section-a", 4)]);
       expect(result).toMatchObject({ applied: false, reason: "locked", changed: 0 });
       expect((await section("section-a")).seats_available).toBe(10);
-      expect((await section("section-a")).seats_updated_at).toBeNull();
     } finally {
       await lock.query("select pg_advisory_unlock(741632871003)");
       await lock.end();
@@ -351,8 +356,7 @@ describe("apply_seat_updates", () => {
     expect(overlap.claim).toEqual({ status: "skipped", reason: "poll" });
   });
 
-  it("updates a changed seat through the poll route and leaves the unchanged row untouched", async () => {
-    process.env.CRON_SECRET = "cron-secret";
+  it("updates a changed seat through the polling job and leaves the unchanged row untouched", async () => {
     const changedCourse = classPlannerCourse(1, {
       open_seat_count: 4,
       sections: [{
@@ -392,8 +396,7 @@ describe("apply_seat_updates", () => {
       });
     };
     const before = await section("section-b");
-    const app = express();
-    app.use("/api/seats", express.Router().get("/poll", createPollSeatsHandler(() => pollOpenSeats({
+    const poll = () => pollOpenSeats({
       claimRun: async (id) => (await claim(id)).claim,
       activeTerm: async () => "FA26",
       scrape: (term) => scrapeClassPlanner(term, { fetch: fetcher }),
@@ -401,14 +404,11 @@ describe("apply_seat_updates", () => {
       failRun: async () => {
         throw new Error("seat poll should have applied");
       },
-    }))));
+    });
 
-    const response = await request(app)
-      .get("/api/seats/poll")
-      .set("Authorization", "Bearer cron-secret")
-      .expect(200);
+    const response = await poll();
 
-    expect(response.body).toMatchObject({
+    expect(response).toMatchObject({
       status: "updated",
       term: "FA26",
       changed: 1,
@@ -417,22 +417,14 @@ describe("apply_seat_updates", () => {
       offeringsUpdated: 1,
     });
     expect((await section("section-a")).seats_available).toBe(4);
-    expect((await section("section-a")).seats_updated_at).not.toBeNull();
     expect(await section("section-b")).toEqual(before);
 
-    await request(app)
-      .get("/api/seats/poll")
-      .set("Authorization", "Bearer wrong")
-      .expect(401);
-    expect((await section("section-a")).seats_available).toBe(4);
   });
 
   it("writes no seat rows when the scrape fails", async () => {
-    process.env.CRON_SECRET = "cron-secret";
     const before = await section("section-a");
     const fetcher: ClassPlannerFetch = async () => new Response(null, { status: 500, statusText: "nope" });
-    const app = express();
-    app.use("/api/seats", express.Router().get("/poll", createPollSeatsHandler(() => pollOpenSeats({
+    const poll = () => pollOpenSeats({
       claimRun: async (id) => (await claim(id)).claim,
       activeTerm: async () => "FA26",
       scrape: (term) => scrapeClassPlanner(term, { fetch: fetcher }),
@@ -445,12 +437,9 @@ describe("apply_seat_updates", () => {
           [id, error],
         );
       },
-    }))));
+    });
 
-    await request(app)
-      .get("/api/seats/poll")
-      .set("Authorization", "Bearer cron-secret")
-      .expect(500);
+    expect(await poll()).toMatchObject({ status: "failed" });
 
     expect(await section("section-a")).toEqual(before);
     const run = await client.query<{ status: string; error_message: string }>(

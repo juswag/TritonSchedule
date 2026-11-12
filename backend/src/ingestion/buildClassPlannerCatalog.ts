@@ -286,9 +286,6 @@ export function buildLegacySections(
         capacity: section.capacity,
         seatsAvailable: section.seats_available,
         waitlisted: section.waitlist_enrolled,
-        ...((section.seats_updated_at ?? section.ingested_at)
-          ? { seatsUpdatedAt: section.seats_updated_at ?? section.ingested_at }
-          : {}),
       },
       SectionId: section.section_id,
       SectionRef: section.section_ref,

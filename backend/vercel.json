@@ -4,10 +4,5 @@
   "buildCommand": "npm run build",
   "env": {
     "NODE_ENV": "production"
-  },
-  "functions": {
-    "src/app.ts": {
-      "maxDuration": 60
-    }
   }
 }

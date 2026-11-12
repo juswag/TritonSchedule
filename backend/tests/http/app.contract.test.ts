@@ -42,11 +42,6 @@ jest.unstable_mockModule("../../src/services/connectToDB.js", () => ({
 }));
 
 jest.unstable_mockModule("../../src/services/supabaseRepository.js", () => ({
-  applySeatUpdates: async () => {
-    throw new Error("seat updates are not part of this contract");
-  },
-  claimSeatPollRun: async () => ({ status: "skipped", reason: "poll" }),
-  failCatalogIngestionRun: async () => {},
   getActiveTermRow: mockGetActiveTermRow,
   searchCourses: mockSearchCourses,
   searchProfessor: mockSearchProfessor,

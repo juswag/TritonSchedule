@@ -213,6 +213,7 @@ export default function SearchCourses() {
     }
 
     const controller = new AbortController();
+    let timer: ReturnType<typeof window.setTimeout> | undefined;
 
     const fetchCourses = async () => {
       if (cacheMatchesTerm && cached) {
@@ -245,6 +246,7 @@ export default function SearchCourses() {
       } finally {
         if (!controller.signal.aborted) {
           setIsBackendLoading(false);
+          timer = window.setTimeout(() => setCacheRevision((revision) => revision + 1), SEARCH_RESULTS_CACHE_TTL_MS);
         }
       }
     };
@@ -253,6 +255,7 @@ export default function SearchCourses() {
 
     return () => {
       controller.abort();
+      window.clearTimeout(timer);
     };
   }, [debouncedSearchQuery, activeTerm, cacheRevision]);
 
@@ -505,7 +508,6 @@ export default function SearchCourses() {
                   {displayedCourses.map((course) => {
                     const isSelected = selectedCourse?.id === course.id;
                     const meetingGroups = getCourseScheduleParts(course);
-                    const seatsAsOf = seatsAsOfLabel(course.enrollment?.seatsUpdatedAt);
                     return (
                       <div
                         key={course.id}
@@ -528,7 +530,6 @@ export default function SearchCourses() {
                           <span className="text-sm font-semibold text-foreground">{getCourseCode(course.name)}</span>
                           <span className="max-w-full truncate text-xs text-foreground/70">{getCourseTitle(course.name)}</span>
                           {course.enrollment?.seatsAvailable != null && <SeatStatus seats={course.enrollment.seatsAvailable} />}
-                          {seatsAsOf && <span className="text-xs text-muted-foreground">{seatsAsOf}</span>}
                         </span>
                         <span className="pointer-events-none relative z-[1] grid min-w-0 grid-rows-[1.75rem_1.25rem] content-center gap-2 text-sm text-foreground/80">
                           <span className="flex items-center truncate">{course.instructor}</span>
@@ -790,17 +791,6 @@ function SearchState({ title, description }: { title: string; description?: stri
   );
 }
 
-function seatsAsOfLabel(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const time = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-  return `seats as of ${time}`;
-}
-
 function SeatStatus({ seats }: { seats: number }) {
   const open = seats > 0;
   const Icon = open ? CircleCheck : CircleMinus;
@@ -820,19 +810,17 @@ function EnrollmentSummary({ enrollment, compact = false, fallback }: {
   fallback?: string;
 }) {
   if (!enrollment || Object.values(enrollment).every(value => value == null)) return fallback ? <span className="mt-2 block text-sm text-muted-foreground">{fallback}</span> : null;
-  const { enrolled, capacity, seatsAvailable, waitlisted, seatsUpdatedAt } = enrollment;
+  const { enrolled, capacity, seatsAvailable, waitlisted } = enrollment;
   const details = [];
   if (enrolled != null && capacity != null) details.push(`${enrolled} of ${capacity} enrolled`);
   else if (enrolled != null) details.push(`${enrolled} enrolled`);
   else if (capacity != null) details.push(`${capacity} total seats`);
   if (waitlisted != null) details.push(`${waitlisted} waitlisted`);
-  const asOf = seatsAsOfLabel(seatsUpdatedAt);
 
   return (
     <span className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground", compact ? "mt-2" : "mt-3")}>
       {seatsAvailable != null && <SeatStatus seats={seatsAvailable} />}
       {details.map(detail => <span key={detail}>{detail}</span>)}
-      {asOf && <span>{asOf}</span>}
     </span>
   );
 }

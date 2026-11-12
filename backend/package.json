@@ -17,7 +17,8 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.cjs --coverage",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.cjs --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.cjs --coverage",
-    "typecheck": "tsc --project tsconfig.json"
+    "typecheck": "tsc --project tsconfig.json",
+    "poll:seats": "tsx src/ingestion/runSeatPoll.ts"
   },
   "keywords": [],
   "author": "",

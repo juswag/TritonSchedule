@@ -5,50 +5,6 @@ alter table private.catalog_ingestion_runs
   add constraint catalog_ingestion_runs_kind
   check (kind in ('nightly', 'seats'));
 
-alter table public.class_planner_sections
-  add column seats_updated_at timestamptz;
-
-alter table public.class_planner_course_offerings
-  add column seats_updated_at timestamptz;
-
-create function private.lock_catalog_ingestion()
-returns void
-language plpgsql
-security invoker
-set search_path = ''
-as $$
-begin
-  perform pg_advisory_xact_lock(741632871004);
-end;
-$$;
-
-create function private.lock_catalog_replace()
-returns void
-language plpgsql
-security invoker
-set search_path = ''
-as $$
-begin
-  perform pg_advisory_xact_lock(741632871003);
-end;
-$$;
-
-create function private.try_lock_catalog_replace()
-returns boolean
-language sql
-security invoker
-set search_path = ''
-as $$
-  select pg_try_advisory_xact_lock(741632871003);
-$$;
-
-revoke all on function private.lock_catalog_ingestion() from public, anon, authenticated;
-revoke all on function private.lock_catalog_replace() from public, anon, authenticated;
-revoke all on function private.try_lock_catalog_replace() from public, anon, authenticated;
-grant execute on function private.lock_catalog_ingestion() to service_role;
-grant execute on function private.lock_catalog_replace() to service_role;
-grant execute on function private.try_lock_catalog_replace() to service_role;
-
 create function private.maintain_catalog_ingestion_runs()
 returns void
 language plpgsql
@@ -119,7 +75,7 @@ security invoker
 set search_path = ''
 as $$
 begin
-  perform private.lock_catalog_ingestion();
+  perform pg_advisory_xact_lock(741632871004);
   perform private.maintain_catalog_ingestion_runs();
 
   if exists (
@@ -174,7 +130,7 @@ as $$
 declare
   skip_reason text;
 begin
-  perform private.lock_catalog_ingestion();
+  perform pg_advisory_xact_lock(741632871004);
   perform private.maintain_catalog_ingestion_runs();
 
   if p_run_id is null then
@@ -446,7 +402,8 @@ begin
     raise exception 'seat update payload is missing an offering rollup';
   end if;
 
-  lock_acquired := private.try_lock_catalog_replace();
+  -- Same lock as finalize_class_planner_catalog_refresh; do not rewrite that function.
+  lock_acquired := pg_try_advisory_xact_lock(741632871003);
 
   if not lock_acquired then
     skip_reason := 'locked';
@@ -510,8 +467,7 @@ begin
       waitlist_capacity = incoming.waitlist_capacity,
       waitlist_enrolled = incoming.waitlist_enrolled,
       waitlist_available = incoming.waitlist_available,
-      status = incoming.status,
-      seats_updated_at = now()
+      status = incoming.status
     from pg_temp.seat_update_input as incoming
     where section.term_code = p_term
       and section.section_id = incoming.section_id
@@ -545,8 +501,7 @@ begin
   set
     open_section_count = rollup.open_section_count,
     open_seat_count = rollup.open_seat_count,
-    waitlist_available_count = rollup.waitlist_available_count,
-    seats_updated_at = now()
+    waitlist_available_count = rollup.waitlist_available_count
   from (
     select distinct on (section.offering_id)
       section.offering_id,
@@ -608,19 +563,3 @@ grant execute on function public.claim_seat_poll_run(uuid, text)
 to service_role;
 grant execute on function public.apply_seat_updates(uuid, text, jsonb, jsonb)
 to service_role;
-
-do $$
-declare
-  definition text := pg_get_functiondef('public.finalize_class_planner_catalog_refresh(uuid)'::regprocedure);
-  rewritten text;
-begin
-  rewritten := replace(
-    definition,
-    'perform pg_advisory_xact_lock(741632871003);',
-    'perform private.lock_catalog_replace();'
-  );
-  if rewritten = definition then
-    raise exception 'catalog replace lock call was not found';
-  end if;
-  execute rewritten;
-end $$;

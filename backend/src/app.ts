@@ -3,10 +3,9 @@ import cors from "cors";
 import express from "express";
 import path from "path";
 import courseRouter from "./routes/courseRouter.js";
-import healthRouter from "./routes/healthRouter.js";
 import rmpRouter from "./routes/rmpRouter.js";
-import seatsRouter from "./routes/seatsRouter.js";
 import termRouter from "./routes/termRouter.js";
+import healthRouter from "./routes/healthRouter.js";
 import { requireAdmin } from "./middleware/auth.js";
 
 // Only load .env file in development (Vercel uses environment variables configured in dashboard)
@@ -39,7 +38,6 @@ app.use(
 app.use(express.json());
 app.use(express.static(path.join(process.cwd(), "public")));
 
-app.use("/api/seats", seatsRouter);
 app.use("/course", courseRouter);
 app.use("/rmp", requireAdmin, rmpRouter);
 app.use("/term", termRouter);

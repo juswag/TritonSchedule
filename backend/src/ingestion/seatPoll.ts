@@ -13,7 +13,7 @@ import {
 } from "../services/supabaseRepository.js";
 import { scrapeClassPlanner } from "./scrapeClassPlanner.js";
 
-export type SeatPollBody = Readonly<{
+export type SeatPollResult = Readonly<{
   status: "updated" | "skipped" | "failed";
   term?: string;
   changed?: number;
@@ -21,11 +21,6 @@ export type SeatPollBody = Readonly<{
   unknown?: number;
   offeringsUpdated?: number;
   reason?: string;
-}>;
-
-export type SeatPollResponse = Readonly<{
-  httpStatus: number;
-  body: SeatPollBody;
 }>;
 
 export type SeatPollDependencies = Readonly<{
@@ -83,14 +78,14 @@ export function seatUpdatesFromCourses(
 
 export async function pollOpenSeats(
   dependencies: SeatPollDependencies = productionDependencies,
-): Promise<SeatPollResponse> {
+): Promise<SeatPollResult> {
   const runId = randomUUID();
   const claim = await dependencies.claimRun(runId);
 
   if (claim.status === "skipped") {
     return {
-      httpStatus: 200,
-      body: { status: "skipped", reason: claim.reason ?? "overlap" },
+      status: "skipped",
+      reason: claim.reason ?? "overlap",
     };
   }
 
@@ -100,7 +95,7 @@ export async function pollOpenSeats(
     const activeTerm = await dependencies.activeTerm();
     if (!activeTerm) {
       await dependencies.failRun({ error: "no active term", id: runId });
-      return { httpStatus: 200, body: { status: "skipped", reason: "no_active_term" } };
+      return { status: "skipped", reason: "no_active_term" };
     }
 
     term = activeTerm;
@@ -117,12 +112,9 @@ export async function pollOpenSeats(
 
     if (!applied.applied) {
       return {
-        httpStatus: 200,
-        body: {
-          status: "skipped",
-          reason: applied.reason ?? "locked",
-          term: activeTerm,
-        },
+        status: "skipped",
+        reason: applied.reason ?? "locked",
+        term: activeTerm,
       };
     }
 
@@ -131,15 +123,12 @@ export async function pollOpenSeats(
     );
 
     return {
-      httpStatus: 200,
-      body: {
-        status: "updated",
-        term: activeTerm,
-        changed: applied.changed,
-        unchanged: applied.unchanged,
-        unknown: applied.unknown,
-        offeringsUpdated: applied.offeringsUpdated,
-      },
+      status: "updated",
+      term: activeTerm,
+      changed: applied.changed,
+      unchanged: applied.unchanged,
+      unknown: applied.unknown,
+      offeringsUpdated: applied.offeringsUpdated,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -154,6 +143,6 @@ export async function pollOpenSeats(
     }
 
     console.error("Seat poll failed:", message);
-    return { httpStatus: 500, body: { status: "failed", term } };
+    return { status: "failed", term };
   }
 }

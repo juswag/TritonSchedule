@@ -5,7 +5,6 @@ export interface Enrollment {
   capacity: number | null;
   seatsAvailable: number | null;
   waitlisted: number | null;
-  seatsUpdatedAt?: string | null;
 }
 
 export interface DiscussionSection {

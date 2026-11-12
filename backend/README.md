@@ -104,18 +104,11 @@ Starting a run rejects overlap with another active nightly run, marks nightly ru
 
 ### Seat polling
 
-[Seat polling](../.github/workflows/seat-poll.yml) calls `GET /api/seats/poll` every 15 minutes through GitHub Actions, with a manual dispatch option. It replaces the Vercel cron, so no Pro upgrade is needed for the schedule. GitHub can delay scheduled runs; this is not a real-time guarantee.
+[Seat polling](../.github/workflows/seat-poll.yml) runs `npm run poll:seats` in GitHub Actions every 15 minutes, with a manual dispatch option. It uses the same `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` Actions secrets as nightly ingestion. No public endpoint, cron token, or Vercel runtime is involved.
 
-Before rollout:
+Apply the seat-poll migration before merging the workflow into the default branch. Scheduled workflows only run from that branch, and GitHub can delay runs.
 
-1. Apply the seat-poll database migration.
-2. Set `CRON_SECRET` on the production backend and save the same value as a repository Actions secret named `CRON_SECRET`.
-3. Set the repository Actions variable `SEAT_POLL_BASE_URL` to the production backend's HTTPS origin (no path, query, or credentials).
-4. Merge the workflow into the default branch and deploy the backend before dispatching it. Scheduled workflows only run from the default branch.
-
-The workflow sends the secret as a bearer token, refuses redirects, and fails on HTTP errors or unexpected response bodies. It does not run on pull requests. Concurrent workflow runs are serialized; the database also guards against overlapping polls and nightly replacement. The Vercel function still has its 60-second runtime limit.
-
-The poll updates existing active-term seat counts only. Unknown sections wait for nightly ingestion. Failed or partial scrapes write nothing; unchanged seats retain their timestamps. Seat-poll audit rows expire after 14 days. Missing or invalid authorization returns 401 before scraping.
+The job updates existing active-term seat counts only. It rejects invalid or partial scrapes and skips writes if the catalog changed during the scrape or a newer poll already applied. Database locking prevents concurrent writes with nightly replacement; overlapping polls are skipped. The existing ingestion audit records outcomes, with seat-poll records retained for 14 days.
 
 ### Manual room and booking import
 
