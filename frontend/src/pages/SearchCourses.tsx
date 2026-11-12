@@ -27,6 +27,12 @@ import { getCourseExams } from "@/lib/examSchedule";
 import { cn } from "@/lib/utils";
 import { getProfessorProfileUrl, normalizeProfessorProfileUrl } from "@/lib/professorProfile";
 import { findConflictingEvents, hasScheduleConflict } from "@/lib/scheduleConflicts";
+import {
+  isSearchCacheFresh,
+  readCachedSearch,
+  SEARCH_RESULTS_CACHE_TTL_MS,
+  writeCachedSearch,
+} from "@/lib/searchResultsCache";
 import { resolveTssBookingUrl } from "@/lib/tssBooking";
 import { toast } from "sonner";
 
@@ -112,29 +118,6 @@ function createApiRequestInit(signal: AbortSignal): RequestInit {
   };
 }
 
-const SEARCH_RESULTS_CACHE_KEY = "searchCourseResultsCache:v5";
-
-type CachedSearch = {
-  query: string;
-  term: string;
-  results: Course[];
-  searchState: "success" | "not_found";
-};
-
-function readCachedSearch(query: string): CachedSearch | null {
-  if (!query) return null;
-  try {
-    const stored = sessionStorage.getItem(SEARCH_RESULTS_CACHE_KEY);
-    const cache = stored ? JSON.parse(stored) : null;
-    return cache?.query === query && typeof cache.term === "string" &&
-      Array.isArray(cache.results) &&
-      cache.searchState === (cache.results.length ? "success" : "not_found")
-      ? cache : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function SearchCourses() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() =>
@@ -148,6 +131,7 @@ export default function SearchCourses() {
     initialCache ? "restored" : "idle"
   );
   const [activeTerm, setActiveTerm] = useState<string | null>(null);
+  const [cacheRevision, setCacheRevision] = useState(0);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
@@ -218,19 +202,29 @@ export default function SearchCourses() {
     if (activeTerm === null) return;
 
     const cached = readCachedSearch(query);
-    if (activeTerm && cached && cached.term === activeTerm) {
+    const cacheMatchesTerm = Boolean(cached && cached.term === activeTerm);
+    if (cacheMatchesTerm && cached && isSearchCacheFresh(cached, Date.now()) && typeof cached.cachedAt === "number") {
       setCoursesFromBackend(cached.results);
       setSearchState(cached.searchState);
       setIsBackendLoading(false);
-      return;
+      const remaining = SEARCH_RESULTS_CACHE_TTL_MS - (Date.now() - cached.cachedAt);
+      const timer = window.setTimeout(() => setCacheRevision((revision) => revision + 1), remaining);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();
+    let timer: ReturnType<typeof window.setTimeout> | undefined;
 
     const fetchCourses = async () => {
-      setIsBackendLoading(true);
-      setSearchState("loading");
-      setCoursesFromBackend([]);
+      if (cacheMatchesTerm && cached) {
+        setCoursesFromBackend(cached.results);
+        setSearchState(cached.searchState);
+        setIsBackendLoading(false);
+      } else {
+        setIsBackendLoading(true);
+        setSearchState("loading");
+        setCoursesFromBackend([]);
+      }
       try {
         const backendCourses = await searchBackendCourses(query, controller.signal, activeTerm);
         if (controller.signal.aborted) return;
@@ -238,23 +232,21 @@ export default function SearchCourses() {
         setCoursesFromBackend(mappedCourses);
         const resolvedSearchState = mappedCourses.length > 0 ? "success" : "not_found";
         setSearchState(resolvedSearchState);
-        sessionStorage.setItem(
-          SEARCH_RESULTS_CACHE_KEY,
-          JSON.stringify({
-            query,
-            term: activeTerm,
-            results: mappedCourses,
-            searchState: resolvedSearchState,
-          })
-        );
+        writeCachedSearch({
+          query,
+          term: activeTerm,
+          results: mappedCourses,
+          searchState: resolvedSearchState,
+          cachedAt: Date.now(),
+        });
       } catch (error) {
-        if ((error as Error).name !== "AbortError") {
-          setCoursesFromBackend([]);
-          setSearchState("error");
-        }
+        if ((error as Error).name === "AbortError" || cacheMatchesTerm) return;
+        setCoursesFromBackend([]);
+        setSearchState("error");
       } finally {
         if (!controller.signal.aborted) {
           setIsBackendLoading(false);
+          timer = window.setTimeout(() => setCacheRevision((revision) => revision + 1), SEARCH_RESULTS_CACHE_TTL_MS);
         }
       }
     };
@@ -263,8 +255,9 @@ export default function SearchCourses() {
 
     return () => {
       controller.abort();
+      window.clearTimeout(timer);
     };
-  }, [debouncedSearchQuery, activeTerm]);
+  }, [debouncedSearchQuery, activeTerm, cacheRevision]);
 
   const displayedCourses = coursesFromBackend;
   const isDebouncingSearch =

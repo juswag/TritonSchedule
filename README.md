@@ -8,6 +8,10 @@
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License: MIT" />
 </div>
 
+## Environment
+
+GitHub Actions polls seats every 15 minutes using the same `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` repository secrets as nightly ingestion. See [seat polling setup](backend/README.md#seat-polling).
+
 ## Features
 
 - Search the active UCSD Class Planner catalog by course, title, or instructor and compare lecture, discussion, and lab choices against the current schedule.

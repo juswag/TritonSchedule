@@ -100,7 +100,15 @@ Partial professor failures update successful ratings, preserve previously stored
 If the school lookup fails or no professor request succeeds, the command exits unsuccessfully after recording the professor-phase failure; it does not roll back the published catalog or replace existing ratings.
 
 Each run writes counts, warnings, publication state, and the workflow URL to `private.catalog_ingestion_runs` through service-role-only functions.
-Starting a run rejects overlap with another active run, marks runs older than four hours as failed, and removes audit and completed or failed catalog-refresh records older than 90 days.
+Starting a run rejects overlap with another active nightly run, marks nightly runs older than four hours as failed, and removes nightly audit rows and completed or failed catalog-refresh records older than 90 days.
+
+### Seat polling
+
+[Seat polling](../.github/workflows/seat-poll.yml) runs `npm run poll:seats` in GitHub Actions every 15 minutes, with a manual dispatch option. It uses the same `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` Actions secrets as nightly ingestion. No public endpoint, cron token, or Vercel runtime is involved.
+
+Apply the seat-poll migration before merging the workflow into the default branch. Scheduled workflows only run from that branch, and GitHub can delay runs.
+
+The job updates existing active-term seat counts only. It rejects invalid or partial scrapes and skips writes if the catalog changed during the scrape or a newer poll already applied. Database locking prevents concurrent writes with nightly replacement; overlapping polls are skipped. The existing ingestion audit records outcomes, with seat-poll records retained for 14 days.
 
 ### Manual room and booking import
 
