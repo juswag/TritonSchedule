@@ -1,0 +1,52 @@
+name: Seat polling
+
+on:
+  schedule:
+    # Offset from the top of the hour to avoid the busiest scheduler window.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: seat-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SEAT_POLL_BASE_URL: ${{ vars.SEAT_POLL_BASE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Refresh production seats
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "::error::Set the CRON_SECRET repository Actions secret."
+            exit 1
+          fi
+          if [[ ! "$SEAT_POLL_BASE_URL" =~ ^https://[a-zA-Z0-9.-]+(:[0-9]+)?/?$ ]]; then
+            echo "::error::Set SEAT_POLL_BASE_URL to the production backend HTTPS origin."
+            exit 1
+          fi
+
+          # Do not follow redirects or retry: a timed-out request may still be running.
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          status="$(curl --silent --show-error --proto '=https' \
+            --connect-timeout 10 --max-time 75 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --output "$response_file" --write-out '%{http_code}' \
+            "${SEAT_POLL_BASE_URL%/}/api/seats/poll")"
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Seat polling returned HTTP $status."
+            exit 1
+          fi
+          if ! jq -e '.status == "updated" or .status == "skipped"' "$response_file" > /dev/null; then
+            echo "::error::Seat polling returned an unexpected response."
+            exit 1
+          fi
+          echo "Seat polling completed: $(jq -r '.status' "$response_file")."

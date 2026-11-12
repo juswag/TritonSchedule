@@ -102,9 +102,20 @@ If the school lookup fails or no professor request succeeds, the command exits u
 Each run writes counts, warnings, publication state, and the workflow URL to `private.catalog_ingestion_runs` through service-role-only functions.
 Starting a run rejects overlap with another active nightly run, marks nightly runs older than four hours as failed, and removes nightly audit rows and completed or failed catalog-refresh records older than 90 days.
 
-`GET /api/seats/poll` refreshes seat counts between nightly publishes. Vercel Cron calls it with `Authorization: Bearer <CRON_SECRET>`. A missing or wrong token returns 401 and does not scrape. The poll reuses the public Class Planner catalog search. `apply_seat_updates` then updates only section rows whose seat, enrollment, waitlist, or status values changed. Unknown section ids are counted and left for the nightly sync. A failed or partial scrape writes no seat rows. Seat poll audit rows use `kind = 'seats'` and are deleted after 14 days. A running seat poll does not block the nightly job. The nightly replace and a seat write share one advisory lock. An overlapping poll skips.
+### Seat polling
 
-Set `CRON_SECRET` on the backend Vercel project. Vercel Cron sends that value as a bearer token. The committed schedule is `0 18 * * *` (18:00 UTC, once a day) because the current project is on Hobby, and Hobby rejects a cron that runs more than once per day. After a Pro upgrade, change that expression to `*/15 * * * *`. The function allows 60 seconds, which is the Hobby limit. Pro can raise `maxDuration` if a full catalog scrape needs longer.
+[Seat polling](../.github/workflows/seat-poll.yml) calls `GET /api/seats/poll` every 15 minutes through GitHub Actions, with a manual dispatch option. It replaces the Vercel cron, so no Pro upgrade is needed for the schedule. GitHub can delay scheduled runs; this is not a real-time guarantee.
+
+Before rollout:
+
+1. Apply the seat-poll database migration.
+2. Set `CRON_SECRET` on the production backend and save the same value as a repository Actions secret named `CRON_SECRET`.
+3. Set the repository Actions variable `SEAT_POLL_BASE_URL` to the production backend's HTTPS origin (no path, query, or credentials).
+4. Merge the workflow into the default branch and deploy the backend before dispatching it. Scheduled workflows only run from the default branch.
+
+The workflow sends the secret as a bearer token, refuses redirects, and fails on HTTP errors or unexpected response bodies. It does not run on pull requests. Concurrent workflow runs are serialized; the database also guards against overlapping polls and nightly replacement. The Vercel function still has its 60-second runtime limit.
+
+The poll updates existing active-term seat counts only. Unknown sections wait for nightly ingestion. Failed or partial scrapes write nothing; unchanged seats retain their timestamps. Seat-poll audit rows expire after 14 days. Missing or invalid authorization returns 401 before scraping.
 
 ### Manual room and booking import
 

@@ -9,11 +9,5 @@
     "src/app.ts": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/seats/poll",
-      "schedule": "0 18 * * *"
-    }
-  ]
+  }
 }
