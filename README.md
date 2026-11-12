@@ -10,7 +10,7 @@
 
 ## Environment
 
-`CRON_SECRET` authorizes `GET /api/seats/poll`. Set it on the backend Vercel project. Vercel Cron sends `Authorization: Bearer` plus that secret. The seat poll schedule is every 15 minutes, which needs a Vercel plan that allows more than one cron run per day.
+`CRON_SECRET` authorizes `GET /api/seats/poll`. Set it on the backend Vercel project. Vercel Cron sends `Authorization: Bearer` plus that secret. The committed schedule runs once a day at 18:00 UTC. Hobby rejects any cron that runs more often. On Pro, change it to every 15 minutes.
 
 ## Features
 
