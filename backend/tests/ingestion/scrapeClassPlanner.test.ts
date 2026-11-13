@@ -152,6 +152,35 @@ describe("scrapeClassPlanner", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it.each([
+    new TypeError("fetch failed"),
+    new DOMException("request timed out", "TimeoutError"),
+  ])("retries transport failures with the same body and a fresh timeout: %s", async (error) => {
+    const fetcher = jest.fn<ClassPlannerFetch>()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(Response.json(page()));
+    expect((await scrapeClassPlanner("FA26", { fetch: fetcher })).courses).toHaveLength(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[1]?.[1]?.body).toBe(fetcher.mock.calls[0]?.[1]?.body);
+    expect(fetcher.mock.calls[1]?.[1]?.signal).not.toBe(fetcher.mock.calls[0]?.[1]?.signal);
+  });
+
+  it("caps transport retries and does not expose error messages or causes", async () => {
+    const fetcher = jest.fn<ClassPlannerFetch>().mockRejectedValue(
+      new TypeError("session=secret", { cause: new Error("secret-token") }),
+    );
+    await expect(scrapeClassPlanner("FA26", { fetch: fetcher }))
+      .rejects.toThrow(/^Class Planner transport request failed after 3 attempt\(s\)$/);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry unexpected errors from the fetch implementation", async () => {
+    const fetcher = jest.fn<ClassPlannerFetch>().mockRejectedValue(new Error("unexpected"));
+    await expect(scrapeClassPlanner("FA26", { fetch: fetcher }))
+      .rejects.toThrow("failed after 1 attempt(s)");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it.each([429, 503])("retries the same public search body after HTTP %s", async (status) => {
     const fetcher = jest.fn<ClassPlannerFetch>()
       .mockResolvedValueOnce(new Response(null, { status }))

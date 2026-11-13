@@ -276,13 +276,26 @@ async function fetchJson<T>(
   }
   const url = CLASS_PLANNER_API + path;
   for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt += 1) {
-    const response = await access.fetch(url, {
-      ...init,
-      headers,
-      // An SSO redirect means the session expired. Never forward the cookie.
-      redirect: "manual",
-      signal: AbortSignal.timeout(30_000),
-    });
+    let response: FetchResponse;
+    try {
+      response = await access.fetch(url, {
+        ...init,
+        headers,
+        // An SSO redirect means the session expired. Never forward the cookie.
+        redirect: "manual",
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      // Fetch rejects for transport failures/timeouts before an HTTP response exists.
+      // Never log the original message or cause: either may contain credentials.
+      const retryable = typeof error === "object" && error !== null && "name" in error &&
+        ["TypeError", "TimeoutError", "AbortError"].includes(String(error.name));
+      if (!retryable || attempt === MAX_REQUEST_ATTEMPTS) {
+        throw new Error(`Class Planner transport request failed after ${attempt} attempt(s)`);
+      }
+      await delay(250 * 2 ** (attempt - 1));
+      continue;
+    }
 
     if (response.ok) {
       return response.json() as Promise<T>;
