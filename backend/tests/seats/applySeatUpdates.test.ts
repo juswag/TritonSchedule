@@ -356,6 +356,101 @@ describe("apply_seat_updates", () => {
     expect(overlap.claim).toEqual({ status: "skipped", reason: "poll" });
   });
 
+  it("fails a nightly run after 150 minutes and still starts one beside a running seat poll", async () => {
+    const ids = {
+      seatFresh: randomUUID(),
+      seatStale: randomUUID(),
+      seatRecent: randomUUID(),
+      seatOld: randomUUID(),
+      nightlyFresh: randomUUID(),
+      nightlyStale: randomUUID(),
+      nightlyRecent: randomUUID(),
+      nightlyOld: randomUUID(),
+    };
+
+    await client.query(
+      `insert into private.catalog_ingestion_runs (id, trigger_name, kind, status, started_at)
+       values
+         ($1, 'cron', 'seats', 'running', now() - interval '19 minutes'),
+         ($2, 'cron', 'seats', 'running', now() - interval '21 minutes'),
+         ($3, 'cron', 'seats', 'succeeded', now() - interval '13 days'),
+         ($4, 'cron', 'seats', 'succeeded', now() - interval '15 days'),
+         ($5, 'schedule', 'nightly', 'running', now() - interval '149 minutes'),
+         ($6, 'schedule', 'nightly', 'running', now() - interval '151 minutes'),
+         ($7, 'schedule', 'nightly', 'succeeded', now() - interval '15 days'),
+         ($8, 'schedule', 'nightly', 'succeeded', now() - interval '91 days')`,
+      [
+        ids.seatFresh,
+        ids.seatStale,
+        ids.seatRecent,
+        ids.seatOld,
+        ids.nightlyFresh,
+        ids.nightlyStale,
+        ids.nightlyRecent,
+        ids.nightlyOld,
+      ],
+    );
+
+    await client.query("select private.maintain_catalog_ingestion_runs()");
+
+    const maintained = await client.query<{
+      id: string;
+      status: string;
+      error_message: string | null;
+    }>("select id, status, error_message from private.catalog_ingestion_runs");
+    const byId = new Map(maintained.rows.map((row) => [row.id, row]));
+
+    expect(byId.get(ids.nightlyFresh)).toMatchObject({ status: "running", error_message: null });
+    expect(byId.get(ids.nightlyStale)).toMatchObject({
+      status: "failed",
+      error_message: "Ingestion run abandoned after 150 minutes",
+    });
+    expect(byId.get(ids.seatFresh)).toMatchObject({ status: "running", error_message: null });
+    expect(byId.get(ids.seatStale)).toMatchObject({
+      status: "failed",
+      error_message: "Seat poll abandoned after 20 minutes",
+    });
+    expect(byId.get(ids.seatRecent)?.status).toBe("succeeded");
+    expect(byId.has(ids.seatOld)).toBe(false);
+    expect(byId.get(ids.nightlyRecent)?.status).toBe("succeeded");
+    expect(byId.has(ids.nightlyOld)).toBe(false);
+
+    await client.query(
+      "update private.catalog_ingestion_runs set status = 'succeeded', completed_at = now() where id = $1",
+      [ids.nightlyFresh],
+    );
+    const nightlyId = randomUUID();
+    await client.query(
+      "select public.begin_catalog_ingestion_run($1::uuid, 'schedule', 'FA26', null, false)",
+      [nightlyId],
+    );
+    const alongside = await client.query<{ id: string; kind: string; status: string }>(
+      "select id, kind, status from private.catalog_ingestion_runs where id = any($1::uuid[]) order by kind",
+      [[ids.seatFresh, nightlyId]],
+    );
+    expect(alongside.rows).toEqual([
+      { id: nightlyId, kind: "nightly", status: "running" },
+      { id: ids.seatFresh, kind: "seats", status: "running" },
+    ]);
+
+    const definitions = await client.query<{ name: string; def: string }>(`
+      select p.proname as name, pg_get_functiondef(p.oid) as def
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where (n.nspname, p.proname) in (
+        ('public', 'begin_catalog_ingestion_run'),
+        ('private', 'maintain_catalog_ingestion_runs')
+      )
+    `);
+    const begin = definitions.rows.find((row) => row.name === "begin_catalog_ingestion_run")?.def ?? "";
+    const maintain = definitions.rows.find((row) => row.name === "maintain_catalog_ingestion_runs")?.def ?? "";
+    expect(begin).toContain("kind = 'nightly'");
+    expect(begin).not.toContain("150 minutes");
+    expect(maintain).toContain("interval '150 minutes'");
+    expect(maintain).toContain("interval '20 minutes'");
+    expect(maintain).toContain("interval '14 days'");
+  });
+
   it("updates a changed seat through the polling job and leaves the unchanged row untouched", async () => {
     const changedCourse = classPlannerCourse(1, {
       open_seat_count: 4,

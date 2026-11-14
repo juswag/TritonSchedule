@@ -92,6 +92,22 @@ describe("app HTTP contracts", () => {
       .expect(200, { data: [{ Name: "CSE 101", Term: "FA25" }] });
   });
 
+  it("When course search omits a term then it is rejected and the catalog is not queried", async () => {
+    for (const query of [
+      { course: "CSE" },
+      { course: "CSE", term: "" },
+      { course: "CSE", term: "   " },
+    ]) {
+      mockSearchCourses.mockClear();
+
+      const response = await request(app).get("/course").query(query);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ message: "A term is required" });
+      expect(mockSearchCourses).not.toHaveBeenCalled();
+    }
+  });
+
   it("When an active term exists then the term endpoint returns it", async () => {
     await request(app)
       .get("/term")

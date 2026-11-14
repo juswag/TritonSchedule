@@ -40,7 +40,7 @@ npm run dev
 ```
 
 The repository-level `npm run dev` starts both the frontend and this backend in watch mode.
-Use the repository-level `npm run setup` first to create environment files, align the frontend and backend API keys, and install all workspace dependencies.
+Use the repository-level `npm run setup` first to create environment files and install workspace dependencies.
 The root [`README.md`](../README.md#environment-variables) documents every environment variable and the optional local Supabase setup.
 
 ## Course search and TSS metadata
@@ -100,7 +100,7 @@ Partial professor failures update successful ratings, preserve previously stored
 If the school lookup fails or no professor request succeeds, the command exits unsuccessfully after recording the professor-phase failure; it does not roll back the published catalog or replace existing ratings.
 
 Each run writes counts, warnings, publication state, and the workflow URL to `private.catalog_ingestion_runs` through service-role-only functions.
-Starting a run rejects overlap with another active nightly run, marks nightly runs older than four hours as failed, and removes nightly audit rows and completed or failed catalog-refresh records older than 90 days.
+Starting a run rejects overlap with another active nightly run. It marks a running nightly ingestion row older than 150 minutes as failed, marks a staging catalog refresh older than four hours as failed, and removes nightly audit rows and completed or failed catalog-refresh records older than 90 days.
 
 ### Seat polling
 
@@ -108,7 +108,7 @@ Starting a run rejects overlap with another active nightly run, marks nightly ru
 
 Apply the seat-poll migration before merging the workflow into the default branch. Scheduled workflows only run from that branch, and GitHub can delay runs.
 
-The job updates existing active-term seat counts only. It rejects invalid or partial scrapes and skips writes if the catalog changed during the scrape or a newer poll already applied. Database locking prevents concurrent writes with nightly replacement; overlapping polls are skipped. The existing ingestion audit records outcomes, with seat-poll records retained for 14 days.
+The job updates existing active-term seat counts only. It rejects invalid or partial scrapes and skips writes if the catalog changed during the scrape or a newer poll already applied. Database locking prevents concurrent writes with nightly replacement; overlapping polls are skipped. The existing ingestion audit records outcomes, with seat-poll records retained for 14 days. A running seat poll still expires after 20 minutes.
 
 ### Manual room and booking import
 
@@ -118,10 +118,11 @@ Course search attaches these details by term, course, and section ID. Rooms also
 
 ## Deployment
 
-Vercel uses `src/app.ts` directly as its Express entry point.
-The app is exported separately from `src/server.ts` so serverless deployment does not create a long-lived listener, while local and standalone deployments can still use `npm start`.
+Vercel deploys this package with the Express preset. `backend/vercel.json` records that preset and runs `npm run build`.
+
+The served entry is `src/app.ts`. The Express builder selects the first candidate that imports `express`. `src/app.ts` does. `src/server.ts` calls `listen` and does not import `express`, so it is not the function entry. `npm start` runs `dist/server.js` for local and standalone Node. Vercel does not run that file.
 
 The GitHub Actions workflow in [`.github/workflows/nightly-ingestion.yml`](../.github/workflows/nightly-ingestion.yml) runs catalog ingestion outside the Vercel request lifecycle.
-It runs nightly at 3:17 AM in `America/Chicago` and also supports manual term and professor-mode inputs.
+The schedule is 3:17 AM in `America/Chicago`. GitHub may start that run later. The workflow also supports manual term and professor-mode inputs.
 Manual dispatches preselect `always` so an operator-requested run refreshes professor ratings by default, while scheduled runs continue using `auto`.
 Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as repository Actions secrets before enabling or dispatching it.
