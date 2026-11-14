@@ -1,6 +1,8 @@
 -- Expire a stuck nightly ingestion row before the 180 minute workflow timeout.
 -- Seat polling moved this maintenance into private.maintain_catalog_ingestion_runs.
--- This migration runs after that change and keeps seat-poll expiry, retention, and kind filters.
+-- This migration runs after that change and only shortens the nightly timeout to 150 minutes.
+-- Seat-poll expiry, retention, and kind filters stay as they are.
+-- It does not replace public.begin_catalog_ingestion_run.
 create or replace function private.maintain_catalog_ingestion_runs()
 returns void
 language plpgsql
