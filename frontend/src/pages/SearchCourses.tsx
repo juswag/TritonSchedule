@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSearchParams } from "react-router-dom";
+import { useNarrowViewport } from "@/hooks/use-narrow-viewport";
 import { Course, CourseExamSection, DiscussionSection, Enrollment } from "@/data/sampleCourses";
 import { useCalendar } from "@/context/CalendarContext";
 import { CalendarEvent, Weekday } from "@/types/calendar";
@@ -119,7 +120,7 @@ function createApiRequestInit(signal: AbortSignal): RequestInit {
 }
 
 export default function SearchCourses() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() =>
     searchParams.get("q") ?? sessionStorage.getItem("searchCoursesQuery") ?? ""
   );
@@ -136,11 +137,36 @@ export default function SearchCourses() {
   const [isMobileDetailsOpen, setIsMobileDetailsOpen] = useState(false);
   const [selectedDiscussionIds, setSelectedDiscussionIds] = useState<Record<string, string>>({});
   const [selectedLabIds, setSelectedLabIds] = useState<Record<string, string>>({});
+  const [searchAttempt, setSearchAttempt] = useState(0);
+  const isNarrow = useNarrowViewport();
   const { events, examOnlyCourses, addEvent, addExamOnlyCourse, deleteEventsByCourseId } = useCalendar();
 
   useEffect(() => {
     sessionStorage.setItem("searchCoursesQuery", searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const current = searchParams.get("q") ?? "";
+    if (current === searchQuery) return;
+    const next = new URLSearchParams(searchParams);
+    if (searchQuery) next.set("q", searchQuery);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  }, [searchQuery, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!isMobileDetailsOpen || !isNarrow) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileDetailsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobileDetailsOpen, isNarrow]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -257,7 +283,7 @@ export default function SearchCourses() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [debouncedSearchQuery, activeTerm, cacheRevision]);
+  }, [debouncedSearchQuery, activeTerm, cacheRevision, searchAttempt]);
 
   const displayedCourses = coursesFromBackend;
   const isDebouncingSearch =
@@ -495,6 +521,15 @@ export default function SearchCourses() {
                 <SearchState
                   title="Search unavailable"
                   description="Try again shortly."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setSearchAttempt((attempt) => attempt + 1)}
+                      className="mt-4 inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                    >
+                      Try again
+                    </button>
+                  }
                 />
               ) : searchQuery.trim().length === 0 ? (
                 <SearchState title="Search courses" />
@@ -591,6 +626,8 @@ export default function SearchCourses() {
               ? "fixed inset-x-0 bottom-0 top-[72px] z-40 xl:sticky xl:top-[72px] xl:z-auto xl:block xl:h-[calc(100vh-72px)] xl:self-start"
               : "hidden xl:sticky xl:top-[72px] xl:block xl:h-[calc(100vh-72px)] xl:self-start"
           )}
+          role={isNarrow && isMobileDetailsOpen ? "dialog" : undefined}
+          aria-modal={isNarrow && isMobileDetailsOpen ? true : undefined}
           aria-label="Selected course details"
         >
           {selectedCourse ? (
@@ -779,7 +816,15 @@ export default function SearchCourses() {
   );
 }
 
-function SearchState({ title, description }: { title: string; description?: string }) {
+function SearchState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex min-h-44 flex-col items-center justify-center px-6 text-center">
       <Search className="h-5 w-5 text-muted-foreground" />
@@ -787,6 +832,7 @@ function SearchState({ title, description }: { title: string; description?: stri
       {description && (
         <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
       )}
+      {action}
     </div>
   );
 }
@@ -1270,6 +1316,10 @@ function parseCourseSchedule(schedule: string): { days: Weekday[]; startTime: st
   };
 }
 
+function oppositePeriod(period: string): string {
+  return period.toUpperCase().startsWith("P") ? "AM" : "PM";
+}
+
 function extractTimeRange(schedule: string): { start: string; end: string } | null {
   const match = schedule.match(
     /(\d{1,2}:\d{2})\s*([AaPp][Mm]?|[AaPp])?\s*-\s*(\d{1,2}:\d{2})\s*([AaPp][Mm]?|[AaPp])?/i
@@ -1280,18 +1330,32 @@ function extractTimeRange(schedule: string): { start: string; end: string } | nu
   }
 
   const [, startBase, startPeriodRaw, endBase, endPeriodRaw] = match;
-  const inferredPeriod = endPeriodRaw ?? startPeriodRaw;
-  const startPeriod = startPeriodRaw ?? inferredPeriod;
+  const startPeriod = startPeriodRaw ?? endPeriodRaw;
   const endPeriod = endPeriodRaw ?? startPeriodRaw;
 
   if (!startPeriod || !endPeriod) {
     return null;
   }
 
-  return {
-    start: convertTo24Hour(`${startBase} ${startPeriod}`),
-    end: convertTo24Hour(`${endBase} ${endPeriod}`),
-  };
+  let start = convertTo24Hour(`${startBase} ${startPeriod}`);
+  let end = convertTo24Hour(`${endBase} ${endPeriod}`);
+
+  // Catalog strings often print the meridiem once. Copying that one marker
+  // onto both ends turns "11:00-12:20p" into 11 PM–12:20 PM. When the copy
+  // runs backwards, the missing side is the other half of the day.
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    if (!startPeriodRaw && endPeriodRaw) {
+      start = convertTo24Hour(`${startBase} ${oppositePeriod(endPeriodRaw)}`);
+    } else if (startPeriodRaw && !endPeriodRaw) {
+      end = convertTo24Hour(`${endBase} ${oppositePeriod(startPeriodRaw)}`);
+    }
+  }
+
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    return null;
+  }
+
+  return { start, end };
 }
 
 function extractWeekdays(schedule: string): Weekday[] {
