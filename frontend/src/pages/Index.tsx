@@ -4,6 +4,7 @@ import { CalendarProvider } from "@/context/CalendarContext";
 import LandingPage from "./LandingPage";
 import SearchCourses from "./SearchCourses";
 import CalendarPage from "./CalendarPage";
+import NotFound from "./NotFound";
 
 const Index = () => {
   const location = useLocation();
@@ -18,6 +19,7 @@ const Index = () => {
               <Route path="/" element={<LandingPage />} />
               <Route path="/courses" element={<SearchCourses />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </div>
         </main>

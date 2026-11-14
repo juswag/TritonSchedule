@@ -14,7 +14,6 @@ const HOUR_HEIGHT = 64;
 const GRID_TOP_GUTTER = 16;
 const START_HOUR = 7;
 const END_HOUR = 22;
-const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, index) => START_HOUR + index);
 const WEEK_DAYS: Array<{ key: Weekday; label: string; shortLabel: string }> = [
   { key: "Mon", label: "Monday", shortLabel: "Mon" },
   { key: "Tue", label: "Tuesday", shortLabel: "Tue" },
@@ -28,11 +27,11 @@ function parseTime(time: string): number {
   return hours + minutes / 60;
 }
 
-function getEventStyle(event: CalendarEvent, columnCount: number, column: number) {
+function getEventStyle(event: CalendarEvent, columnCount: number, column: number, startHour: number) {
   const startTime = parseTime(event.startTime);
   const endTime = parseTime(event.endTime);
   const duration = endTime - startTime;
-  const top = GRID_TOP_GUTTER + (startTime - START_HOUR) * HOUR_HEIGHT;
+  const top = GRID_TOP_GUTTER + (startTime - startHour) * HOUR_HEIGHT;
   const height = Math.max(duration * HOUR_HEIGHT, 34);
   const width = `${100 / columnCount}%`;
   const left = `${(column * 100) / columnCount}%`;
@@ -40,7 +39,25 @@ function getEventStyle(event: CalendarEvent, columnCount: number, column: number
   return { top, height, width, left };
 }
 
-function layoutDay(events: CalendarEvent[]) {
+function visibleHours(events: CalendarEvent[]) {
+  let start = START_HOUR;
+  let end = END_HOUR;
+  for (const event of events) {
+    const startTime = parseTime(event.startTime);
+    const endTime = parseTime(event.endTime);
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) continue;
+    start = Math.min(start, Math.floor(startTime));
+    end = Math.max(end, Math.ceil(endTime));
+  }
+  start = Math.max(0, start);
+  end = Math.min(24, Math.max(end, start + 1));
+  return {
+    startHour: start,
+    hours: Array.from({ length: end - start }, (_, index) => start + index),
+  };
+}
+
+function layoutDay(events: CalendarEvent[], startHour: number) {
   const ordered = [...events].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
   const groups: { columnEnds: number[]; items: { event: CalendarEvent; column: number }[] }[] = [];
   for (const event of ordered) {
@@ -56,7 +73,7 @@ function layoutDay(events: CalendarEvent[]) {
     group.items.push({ event, column });
   }
   return groups.flatMap(({ columnEnds, items }) => items.map(({ event, column }) => ({
-    event, style: getEventStyle(event, columnEnds.length, column),
+    event, style: getEventStyle(event, columnEnds.length, column, startHour),
   })));
 }
 
@@ -119,6 +136,8 @@ export default function CalendarPage() {
     () => events.filter((event) => event.dayOfWeek === selectedMobileDay).sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime)),
     [events, selectedMobileDay]
   );
+  const { startHour, hours } = useMemo(() => visibleHours(events), [events]);
+  const selectedDayLabel = WEEK_DAYS.find((day) => day.key === selectedMobileDay)?.label ?? selectedMobileDay;
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-[#fcfdff] dark:bg-background px-4 py-6 sm:px-7">
@@ -179,6 +198,7 @@ export default function CalendarPage() {
                   key={day.key}
                   type="button"
                   onClick={() => setSelectedMobileDay(day.key)}
+                  aria-pressed={selectedMobileDay === day.key}
                   className={cn(
                     "relative px-1 py-3 text-xs font-medium transition-colors",
                     selectedMobileDay === day.key
@@ -193,7 +213,7 @@ export default function CalendarPage() {
 
             {mobileEvents.length === 0 ? (
               <div className="px-5 py-14 text-center">
-                <p className="text-sm font-semibold text-foreground">No classes on {selectedMobileDay}</p>
+                <p className="text-sm font-semibold text-foreground">No classes on {selectedDayLabel}</p>
                 <p className="mt-1 text-sm text-muted-foreground">Choose another day or add a course.</p>
               </div>
             ) : (
@@ -245,10 +265,10 @@ export default function CalendarPage() {
 
               <div
                 className="grid min-w-[760px] grid-cols-[64px_repeat(5,minmax(130px,1fr))]"
-                style={{ height: `${GRID_TOP_GUTTER + HOURS.length * HOUR_HEIGHT}px` }}
+                style={{ height: `${GRID_TOP_GUTTER + hours.length * HOUR_HEIGHT}px` }}
               >
                 <div className="relative border-r border-border bg-card">
-                  {HOURS.map((hour, index) => (
+                  {hours.map((hour, index) => (
                     <span
                       key={hour}
                       className="absolute right-2 -translate-y-1/2 bg-card px-1 text-[10px] font-medium leading-none text-muted-foreground"
@@ -263,7 +283,7 @@ export default function CalendarPage() {
                   const dayEvents = events.filter((event) => event.dayOfWeek === day.key);
                   return (
                     <div key={day.key} className="relative border-r border-border last:border-r-0">
-                      {HOURS.map((hour, index) => (
+                      {hours.map((hour, index) => (
                         <div
                           key={hour}
                           className="absolute inset-x-0 border-t border-border/75"
@@ -271,7 +291,7 @@ export default function CalendarPage() {
                         />
                       ))}
 
-                      {layoutDay(dayEvents).map(({ event, style }) => {
+                      {layoutDay(dayEvents, startHour).map(({ event, style }) => {
                         const hasConflict = conflictingIds.has(event.id);
                         const blockTitle = meetingLabel(event);
                         return (
@@ -316,7 +336,7 @@ export default function CalendarPage() {
                               <button
                                 type="button"
                                 onClick={() => removeEvent(event)}
-                                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-card/95 text-muted-foreground opacity-0 shadow-sm transition hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+                                className="schedule-remove absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-card/95 text-muted-foreground shadow-sm transition hover:text-destructive"
                                 aria-label={`Remove ${event.title}`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -343,8 +363,10 @@ export default function CalendarPage() {
 }
 
 function formatHour(hour: number): string {
-  if (hour === 12) return "12 PM";
-  return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
+  const normalized = ((hour % 24) + 24) % 24;
+  if (normalized === 0) return "12 AM";
+  if (normalized === 12) return "12 PM";
+  return normalized > 12 ? `${normalized - 12} PM` : `${normalized} AM`;
 }
 
 function formatTo12Hour(time: string): string {

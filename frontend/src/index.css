@@ -115,6 +115,25 @@
   animation: page-fade-in 160ms ease-out;
 }
 
+/* The week grid hides removal until hover. Touch screens have no hover,
+   so the control stays visible unless the device can actually hover. */
+.schedule-remove {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .schedule-remove {
+    opacity: 0;
+  }
+
+  .group:hover .schedule-remove,
+  .group:focus-within .schedule-remove,
+  .schedule-remove:focus,
+  .schedule-remove:focus-visible {
+    opacity: 1;
+  }
+}
+
 .glass-panel {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
