@@ -20,6 +20,7 @@ import {
   normalizeTeacherKey,
   teacherNamesMatch,
 } from "../utils/normalizeTeacherKey.js";
+import { DatabaseError, formatUnknownError } from "../utils/formatUnknownError.js";
 import { connectToDB } from "./connectToDB.js";
 
 type MeetingRow = ClassPlannerMeeting & {
@@ -83,8 +84,8 @@ const PROFESSOR_COLUMNS = "name,name_key,avg_rating,avg_diff,take_again_percent,
 const LEGACY_PROFESSOR_COLUMNS = "name,name_key,avg_rating,avg_diff,take_again_percent";
 const NORMALIZED_SUBJECT_CODES = new Set(SUBJECT_CODES.map((subjectCode) => subjectCode.trim()));
 
-function throwIfError(error: PostgrestError | null) {
-  if (error) throw error;
+function throwIfError(error: PostgrestError | null, status?: number) {
+  if (error) throw new DatabaseError(error, status);
 }
 
 function isMissingProfileUrlColumn(error: PostgrestError | null): boolean {
@@ -99,7 +100,7 @@ function isMissingProfileUrlColumn(error: PostgrestError | null): boolean {
 }
 
 async function selectProfessorRows(
-  execute: (columns: string) => Promise<{ data: unknown; error: PostgrestError | null }>,
+  execute: (columns: string) => Promise<{ data: unknown; error: PostgrestError | null; status?: number }>,
 ): Promise<ProfessorRow[]> {
   let result = await execute(PROFESSOR_COLUMNS);
 
@@ -107,7 +108,7 @@ async function selectProfessorRows(
     result = await execute(LEGACY_PROFESSOR_COLUMNS);
   }
 
-  throwIfError(result.error);
+  throwIfError(result.error, result.status);
   return (result.data ?? []) as ProfessorRow[];
 }
 
@@ -373,8 +374,8 @@ export async function searchCourses(course: string, term: string) {
 
     query = query.eq("term_code", normalizedTerm);
 
-    const { data, error } = await query;
-    throwIfError(error);
+    const { data, error, status } = await query;
+    throwIfError(error, status);
 
     const page = (data ?? []) as unknown as OfferingRow[];
     rows.push(...page);
@@ -460,7 +461,7 @@ async function stageAndPublishCatalog(
     batches.map(([kind, items]) => [kind, items.length]),
   );
 
-  const { error: beginError } = await supabase.rpc(
+  const { error: beginError, status: beginStatus } = await supabase.rpc(
     "begin_class_planner_catalog_refresh",
     {
       p_expected_counts: expectedCounts,
@@ -468,12 +469,12 @@ async function stageAndPublishCatalog(
       p_term: term,
     },
   );
-  throwIfError(beginError);
+  throwIfError(beginError, beginStatus);
 
   try {
     for (const [kind, items] of batches) {
       for (let offset = 0; offset < items.length; offset += CATALOG_BATCH_SIZE) {
-        const { error: stageError } = await supabase.rpc(
+        const { error: stageError, status: stageStatus } = await supabase.rpc(
           "stage_class_planner_catalog_batch",
           {
             p_item_kind: kind,
@@ -481,18 +482,18 @@ async function stageAndPublishCatalog(
             p_refresh_id: refreshId,
           },
         );
-        throwIfError(stageError);
+        throwIfError(stageError, stageStatus);
       }
     }
 
-    const { error: finalizeError } = await supabase.rpc(
+    const { error: finalizeError, status: finalizeStatus } = await supabase.rpc(
       finalize,
       { p_refresh_id: refreshId },
     );
-    throwIfError(finalizeError);
+    throwIfError(finalizeError, finalizeStatus);
   } catch (error) {
     await supabase.rpc("fail_class_planner_catalog_refresh", {
-      p_error: error instanceof Error ? error.message : "Catalog refresh failed",
+      p_error: formatUnknownError(error),
       p_refresh_id: refreshId,
     });
     throw error;
@@ -514,10 +515,10 @@ export async function upsertProfessors(professors: readonly RMP[]) {
         profile_url: professor.profileUrl ?? null,
         take_again_percent: professor.takeAgainPercent,
       }));
-    const { error } = await supabase
+    const { error, status } = await supabase
       .from("professor")
       .upsert(rows, { onConflict: "name_key" });
-    throwIfError(error);
+    throwIfError(error, status);
   }
 }
 
@@ -543,14 +544,14 @@ export type CatalogIngestionRunFinish = Readonly<{
 /** Starts an audited run after stale-run cleanup and overlap validation. */
 export async function beginCatalogIngestionRun(input: CatalogIngestionRunStart) {
   const supabase = connectToDB();
-  const { error } = await supabase.rpc("begin_catalog_ingestion_run", {
+  const { error, status } = await supabase.rpc("begin_catalog_ingestion_run", {
     p_professors_requested: input.professorsRequested,
     p_requested_term: input.requestedTerm ?? null,
     p_run_id: input.id,
     p_trigger: input.trigger,
     p_workflow_url: input.workflowUrl ?? null,
   });
-  throwIfError(error);
+  throwIfError(error, status);
 }
 
 /** Records a successful audited run, including any warning status. */
@@ -558,7 +559,7 @@ export async function completeCatalogIngestionRun(
   input: CatalogIngestionRunFinish,
 ) {
   const supabase = connectToDB();
-  const { error } = await supabase.rpc("complete_catalog_ingestion_run", {
+  const { error, status } = await supabase.rpc("complete_catalog_ingestion_run", {
     p_catalog_counts: input.catalogCounts,
     p_catalog_published: input.catalogPublished,
     p_professor_counts: input.professorCounts,
@@ -566,7 +567,7 @@ export async function completeCatalogIngestionRun(
     p_run_id: input.id,
     p_warnings: input.warnings,
   });
-  throwIfError(error);
+  throwIfError(error, status);
 }
 
 /** Records a failed audited run without changing its published data. */
@@ -574,7 +575,7 @@ export async function failCatalogIngestionRun(
   input: CatalogIngestionRunFinish & Readonly<{ error: string }>,
 ) {
   const supabase = connectToDB();
-  const { error } = await supabase.rpc("fail_catalog_ingestion_run", {
+  const { error, status } = await supabase.rpc("fail_catalog_ingestion_run", {
     p_catalog_counts: input.catalogCounts,
     p_catalog_published: input.catalogPublished,
     p_error: input.error,
@@ -583,7 +584,7 @@ export async function failCatalogIngestionRun(
     p_run_id: input.id,
     p_warnings: input.warnings,
   });
-  throwIfError(error);
+  throwIfError(error, status);
 }
 
 function numberField(record: Record<string, unknown>, key: string): number {
@@ -624,11 +625,11 @@ function parseSeatApplyResult(value: unknown): SeatApplyResult {
 
 export async function claimSeatPollRun(id: string): Promise<SeatPollClaim> {
   const supabase = connectToDB();
-  const { data, error } = await supabase.rpc("claim_seat_poll_run", {
+  const { data, error, status } = await supabase.rpc("claim_seat_poll_run", {
     p_run_id: id,
     p_trigger: "cron",
   });
-  throwIfError(error);
+  throwIfError(error, status);
   return parseSeatPollClaim(data);
 }
 
@@ -638,33 +639,33 @@ export async function applySeatUpdates(
   update: SeatUpdateBatch,
 ): Promise<SeatApplyResult> {
   const supabase = connectToDB();
-  const { data, error } = await supabase.rpc("apply_seat_updates", {
+  const { data, error, status } = await supabase.rpc("apply_seat_updates", {
     p_offerings: update.offerings,
     p_run_id: runId,
     p_sections: update.sections,
     p_term: term,
   });
-  throwIfError(error);
+  throwIfError(error, status);
   return parseSeatApplyResult(data);
 }
 
 /** Reports whether the latest requested professor phase warned or failed. */
 export async function shouldRetryProfessorRefresh(): Promise<boolean> {
   const supabase = connectToDB();
-  const { data, error } = await supabase.rpc("should_retry_professor_refresh");
-  throwIfError(error);
+  const { data, error, status } = await supabase.rpc("should_retry_professor_refresh");
+  throwIfError(error, status);
   return data === true;
 }
 
 export async function getActiveTermRow() {
   const supabase = connectToDB();
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from("terms")
     .select("term,is_active")
     .eq("is_active", true)
     .maybeSingle();
 
-  throwIfError(error);
+  throwIfError(error, status);
 
   return data ? toTermDocument(data as TermRow) : null;
 }
@@ -674,12 +675,12 @@ export async function searchProfessor(nameKey?: string) {
 
   if (nameKey) {
     const rows = await selectProfessorRows(async (columns) => {
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from("professor")
         .select(columns)
         .eq("name_key", nameKey)
         .order("name", { ascending: true });
-      return { data, error };
+      return { data, error, status };
     });
 
     return toExactRmpDocuments(rows);
@@ -690,12 +691,12 @@ export async function searchProfessor(nameKey?: string) {
 
   while (true) {
     const page = await selectProfessorRows(async (columns) => {
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from("professor")
         .select(columns)
         .order("name", { ascending: true })
         .range(offset, offset + PAGE_SIZE - 1);
-      return { data, error };
+      return { data, error, status };
     });
     rows.push(...page);
 

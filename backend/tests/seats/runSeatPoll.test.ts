@@ -17,6 +17,15 @@ describe("seat polling command", () => {
       .rejects.toThrow("Seat polling failed");
   });
 
+  it("includes the serialized poll failure in the command error", async () => {
+    await expect(runSeatPoll(async () => ({
+      status: "failed",
+      reason: "message=seat update payload contains invalid seat values; code=P0001; status=400",
+    }))).rejects.toThrow(
+      "Seat polling failed: message=seat update payload contains invalid seat values; code=P0001; status=400",
+    );
+  });
+
   it("propagates a database failure before scraping", async () => {
     await expect(runSeatPoll(async () => { throw new Error("database unavailable"); }))
       .rejects.toThrow("database unavailable");

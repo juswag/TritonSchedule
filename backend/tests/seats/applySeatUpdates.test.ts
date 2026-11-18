@@ -242,7 +242,7 @@ describe("apply_seat_updates", () => {
 
     await expect(apply(id, [
       sectionPayload("section-a", 4, 96),
-      sectionPayload("section-b", -1, 93),
+      sectionPayload("section-b", 7, 93, { capacity: -1 }),
     ], [
       offeringPayload("section-a", 4),
       offeringPayload("section-b", 7),
@@ -255,6 +255,35 @@ describe("apply_seat_updates", () => {
       [id],
     );
     expect(run.rows[0]?.status).toBe("running");
+  });
+
+  it("stores negative available seats when a section is over-enrolled", async () => {
+    const { id } = await claim();
+    const result = await apply(id, [
+      sectionPayload("section-a", -8, 108, {
+        status: "waitlist_only",
+        waitlist_available: -3,
+      }),
+    ], [offeringPayload("section-a", 0)]);
+
+    expect(result).toMatchObject({ applied: true, changed: 1, offeringsUpdated: 1 });
+    const row = await client.query<{
+      seats_available: number;
+      enrolled: number;
+      waitlist_available: number;
+      status: string;
+    }>(
+      `select seats_available, enrolled, waitlist_available, status
+       from public.class_planner_sections
+       where term_code = 'FA26' and section_id = 'section-a'`,
+    );
+    expect(row.rows[0]).toEqual({
+      seats_available: -8,
+      enrolled: 108,
+      waitlist_available: -3,
+      status: "waitlist_only",
+    });
+    expect((await offering("offering-a")).open_seat_count).toBe(0);
   });
 
   it("writes no seat rows when duplicate section ids are supplied", async () => {
