@@ -11,6 +11,7 @@ import {
   failCatalogIngestionRun,
   getActiveTermRow,
 } from "../services/supabaseRepository.js";
+import { formatUnknownError } from "../utils/formatUnknownError.js";
 import { scrapeClassPlanner } from "./scrapeClassPlanner.js";
 
 export type SeatPollResult = Readonly<{
@@ -131,18 +132,15 @@ export async function pollOpenSeats(
       offeringsUpdated: applied.offeringsUpdated,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatUnknownError(error);
 
     try {
       await dependencies.failRun({ error: message, id: runId, term });
     } catch (auditError) {
-      console.error(
-        "Failed to record seat poll failure:",
-        auditError instanceof Error ? auditError.message : auditError,
-      );
+      console.error("Failed to record seat poll failure:", formatUnknownError(auditError));
     }
 
     console.error("Seat poll failed:", message);
-    return { status: "failed", term };
+    return { status: "failed", term, reason: message };
   }
 }
